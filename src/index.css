@@ -1,0 +1,399 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ---- Light ("day sky") tokens ---- */
+  --bg: #f6f8fc;
+  --bg-2: #edf1f8;
+  --panel: #ffffff;
+  --panel-2: #f2f4f9;
+  --panel-3: #e7ebf3;
+  --border: #d8dee9;
+  --border-soft: #e4e8f1;
+  --accent: #2f6fed;
+  --accent-soft: #1f4fcb;
+  --accent-glow: #6e93ff;
+  --accent-2: #e8b33d;
+  --text: #171a23;
+  --text-muted: #5b6270;
+  --text-dim: #8a909d;
+  --good: #1f9d55;
+  --danger: #e5484d;
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(23, 26, 35, 0.04), 0 10px 28px rgba(23, 26, 35, 0.07);
+
+  --stars-opacity: 0;
+  --nebula-opacity: 0.16;
+  --nebula-blur: 70px;
+}
+
+[data-theme='dark'] {
+  --bg: #070914;
+  --bg-2: #0b0e1c;
+  --panel: #12162a;
+  --panel-2: #191f38;
+  --panel-3: #232a48;
+  --border: #323a5c;
+  --border-soft: #262d4a;
+  --accent: #7c9cff;
+  --accent-soft: #5c7fe8;
+  --accent-glow: #a9bcff;
+  --accent-2: #f0c875;
+  --text: #f3f5fc;
+  --text-muted: #a6adc9;
+  --text-dim: #6e7591;
+  --good: #3ddc97;
+  --danger: #ff6b6b;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 34px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03);
+
+  --stars-opacity: 1;
+  --nebula-opacity: 0.55;
+  --nebula-blur: 60px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
+  overflow-x: hidden;
+}
+
+.mono,
+code,
+pre {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+/* ================= Cosmic background layer ================= */
+
+.cosmic-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cosmic-bg .nebula {
+  position: absolute;
+  inset: -20%;
+  opacity: var(--nebula-opacity);
+  filter: blur(var(--nebula-blur));
+  background-image: radial-gradient(40% 35% at 15% 20%, #bfd2ff, transparent 70%),
+    radial-gradient(35% 30% at 88% 12%, #ffe7b8, transparent 70%), radial-gradient(45% 40% at 60% 85%, #e4e1ff, transparent 70%);
+  transition: opacity 0.3s ease;
+  animation: gandalf-drift 50s ease-in-out infinite;
+}
+[data-theme='dark'] .cosmic-bg .nebula {
+  background-image: radial-gradient(40% 35% at 15% 20%, #6e56e8, transparent 70%),
+    radial-gradient(35% 30% at 88% 12%, #22d3ee, transparent 70%), radial-gradient(45% 40% at 60% 85%, #d946a8, transparent 70%);
+}
+
+.cosmic-bg .stars,
+.cosmic-bg .stars-2,
+.cosmic-bg .stars-3 {
+  position: absolute;
+  inset: 0;
+  opacity: var(--stars-opacity);
+  background-repeat: repeat;
+  transition: opacity 0.3s ease;
+}
+.cosmic-bg .stars {
+  background-image: radial-gradient(1px 1px at 20px 30px, #fff, transparent), radial-gradient(1px 1px at 90px 70px, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 150px 40px, #fff, transparent), radial-gradient(1px 1px at 60px 130px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 180px 150px, #fff, transparent);
+  background-size: 220px 220px;
+}
+.cosmic-bg .stars-2 {
+  background-image: radial-gradient(1.6px 1.6px at 40px 60px, #fff, transparent),
+    radial-gradient(1.4px 1.4px at 140px 20px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1.8px 1.8px at 260px 120px, #fff, transparent), radial-gradient(1.4px 1.4px at 320px 200px, rgba(255, 255, 255, 0.85), transparent);
+  background-size: 380px 380px;
+  animation: gandalf-twinkle 5s ease-in-out infinite alternate;
+}
+.cosmic-bg .stars-3 {
+  background-image: radial-gradient(2.2px 2.2px at 80px 100px, #fff, transparent), radial-gradient(2px 2px at 300px 40px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(2.4px 2.4px at 480px 260px, #fff, transparent);
+  background-size: 560px 560px;
+  animation: gandalf-twinkle 7s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes gandalf-twinkle {
+  from {
+    opacity: calc(var(--stars-opacity) * 0.55);
+  }
+  to {
+    opacity: var(--stars-opacity);
+  }
+}
+@keyframes gandalf-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(-2%, 1.5%) rotate(2deg);
+  }
+}
+
+/* ================= Shared components (domain chips, code blocks, etc.) ================= */
+/* Kept as plain CSS (rather than Tailwind utilities) because each has a
+   light + dark variant pair that's clearer to read side by side. */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  background: var(--panel-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border-soft);
+  white-space: nowrap;
+}
+.chip.domain-dsa {
+  color: #1f4fcb;
+  background: rgba(47, 111, 237, 0.09);
+  border-color: rgba(47, 111, 237, 0.2);
+}
+.chip.domain-sql {
+  color: #9c6b00;
+  background: rgba(232, 179, 61, 0.16);
+  border-color: rgba(232, 179, 61, 0.35);
+}
+.chip.domain-sd {
+  color: #6b3fbe;
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.25);
+}
+.chip.domain-ml {
+  color: #1f9d55;
+  background: rgba(31, 157, 85, 0.1);
+  border-color: rgba(31, 157, 85, 0.25);
+}
+.chip.domain-quant {
+  color: #c2410c;
+  background: rgba(234, 88, 12, 0.1);
+  border-color: rgba(234, 88, 12, 0.22);
+}
+[data-theme='dark'] .chip.domain-dsa {
+  color: #9db6ff;
+  background: rgba(124, 156, 255, 0.14);
+  border-color: rgba(124, 156, 255, 0.3);
+}
+[data-theme='dark'] .chip.domain-sql {
+  color: #f0c875;
+  background: rgba(240, 200, 117, 0.14);
+  border-color: rgba(240, 200, 117, 0.32);
+}
+[data-theme='dark'] .chip.domain-sd {
+  color: #c4abff;
+  background: rgba(167, 139, 250, 0.16);
+  border-color: rgba(167, 139, 250, 0.35);
+}
+[data-theme='dark'] .chip.domain-ml {
+  color: #6ee7b7;
+  background: rgba(61, 220, 151, 0.14);
+  border-color: rgba(61, 220, 151, 0.3);
+}
+[data-theme='dark'] .chip.domain-quant {
+  color: #ffb08a;
+  background: rgba(255, 138, 76, 0.14);
+  border-color: rgba(255, 138, 76, 0.3);
+}
+
+.tier-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-block;
+}
+.tier-chip.foundational {
+  background: var(--panel-3);
+  color: var(--text-muted);
+}
+.tier-chip.core {
+  background: rgba(47, 111, 237, 0.12);
+  color: var(--accent-soft);
+}
+.tier-chip.advanced {
+  background: rgba(232, 179, 61, 0.18);
+  color: #8a5a00;
+}
+[data-theme='dark'] .tier-chip.core {
+  background: rgba(124, 156, 255, 0.18);
+  color: #b7c7ff;
+}
+[data-theme='dark'] .tier-chip.advanced {
+  background: rgba(240, 200, 117, 0.2);
+  color: #f5d28e;
+}
+
+.status-pill {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.status-pill.active {
+  background: rgba(47, 111, 237, 0.1);
+  color: var(--accent-soft);
+}
+.status-pill.mastered {
+  background: rgba(31, 157, 85, 0.12);
+  color: var(--good);
+}
+.status-pill.abandoned {
+  background: var(--panel-3);
+  color: var(--text-dim);
+}
+[data-theme='dark'] .status-pill.active {
+  background: rgba(124, 156, 255, 0.16);
+  color: #b7c7ff;
+}
+[data-theme='dark'] .status-pill.mastered {
+  background: rgba(61, 220, 151, 0.16);
+  color: var(--good);
+}
+
+.progress-track {
+  height: 7px;
+  background: var(--panel-3);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-track.small {
+  height: 5px;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.code-block {
+  background: #10121c;
+  color: #e8eaef;
+  border-radius: var(--radius-sm);
+  padding: 18px 20px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  overflow-x: auto;
+  margin: 6px 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  white-space: pre;
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 11px 14px;
+  font-size: 13.5px;
+  color: var(--text);
+  cursor: pointer;
+  background: var(--panel);
+  text-align: left;
+  width: 100%;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.option-row:hover:not(:disabled) {
+  background: var(--panel-2);
+}
+.option-row:disabled {
+  cursor: default;
+}
+.option-row .letter {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.option-row.correct {
+  border-color: rgba(31, 157, 85, 0.4);
+  background: rgba(31, 157, 85, 0.06);
+}
+.option-row.correct .letter {
+  background: var(--good);
+  border-color: var(--good);
+  color: #fff;
+}
+.option-row.incorrect {
+  border-color: rgba(229, 72, 77, 0.35);
+  background: rgba(229, 72, 77, 0.05);
+}
+.option-row.incorrect .letter {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+[data-theme='dark'] .option-row.correct {
+  background: rgba(61, 220, 151, 0.1);
+}
+[data-theme='dark'] .option-row.incorrect {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-soft);
+  background: rgba(47, 111, 237, 0.07);
+  border: 1px solid rgba(47, 111, 237, 0.18);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+[data-theme='dark'] .source-chip {
+  color: #b7c7ff;
+  background: rgba(124, 156, 255, 0.12);
+  border-color: rgba(124, 156, 255, 0.28);
+}
+
+/* ---------- Scrollbar (subtle, theme-aware) ---------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--panel-3);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
