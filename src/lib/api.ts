@@ -123,10 +123,13 @@ export interface ValidationResult {
   independentAnswer: string;
   keyIsCorrect: boolean;
   verdict: string;
+  correctAnswerText: string | null;
   storedCorrectOption: string;
-  updatedCorrectOption: string;
+  updatedCorrectOption: string | null;
   updatedExplanation: string;
   isCorrect: boolean | null;
+  flaggedBroken: boolean;
+  validatedAt: string;
   changed: boolean;
 }
 

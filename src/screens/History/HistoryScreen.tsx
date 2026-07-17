@@ -6,7 +6,7 @@ import { DomainChip } from '../../components/ui/Chip';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { usePageTitle } from '../../lib/PageTitleContext';
 import { useAuth } from '../../lib/AuthContext';
-import { listCompletedSessions, listDistinctTags, listDistinctTopics } from '../../lib/history';
+import { listCompletedSessions, listDistinctTags, listDistinctTopics, listFlaggedSessionIds } from '../../lib/history';
 import type { QuizSession, SessionType } from '../../types/db';
 
 const SESSION_TYPE_LABELS: Record<SessionType, string> = {
@@ -27,14 +27,16 @@ export function HistoryScreen() {
   const [topic, setTopic] = useState(ALL);
   const [tag, setTag] = useState(ALL);
   const [sessions, setSessions] = useState<QuizSession[]>([]);
+  const [flaggedIds, setFlaggedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   usePageTitle('History');
 
   useEffect(() => {
-    Promise.all([listDistinctTopics(userId), listDistinctTags(userId)]).then(([t, g]) => {
+    Promise.all([listDistinctTopics(userId), listDistinctTags(userId), listFlaggedSessionIds(userId)]).then(([t, g, flagged]) => {
       setTopics(t);
       setTags(g);
+      setFlaggedIds(flagged);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -84,7 +86,18 @@ export function HistoryScreen() {
                 <div className="flex items-center gap-2.5">
                   {s.domain && <DomainChip domain={s.domain} />}
                   <div>
-                    <div className="text-[14px] font-semibold">{s.topic || 'Untitled session'}</div>
+                    <div className="flex items-center gap-1.5 text-[14px] font-semibold">
+                      {s.topic || 'Untitled session'}
+                      {flaggedIds.has(s.id) && (
+                        <span
+                          className="rounded-full px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide"
+                          style={{ color: 'var(--accent-2)', background: 'color-mix(in srgb, var(--accent-2) 15%, transparent)' }}
+                          title="This session has at least one question flagged as flawed during validation"
+                        >
+                          Flagged
+                        </span>
+                      )}
+                    </div>
                     <div className="text-[12px] text-text-muted">
                       {SESSION_TYPE_LABELS[s.session_type]} · {new Date(s.taken_at).toLocaleDateString()}
                     </div>

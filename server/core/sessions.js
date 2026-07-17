@@ -365,11 +365,77 @@ export async function explainQuestion(userId, { questionId }) {
   return { explanation };
 }
 
+/** Recomputes one quiz session's `score` straight from its questions, excluding
+ *  any `flagged_broken` ones from both the numerator and denominator — so a
+ *  question found to have no correct option among its choices (see
+ *  `validateQuestion`) neither helps nor hurts the session score. */
+async function recomputeSessionScore(admin, sessionId) {
+  const { data: qs } = await admin.from('quiz_questions').select('is_correct, flagged_broken').eq('quiz_session_id', sessionId);
+  const counted = (qs ?? []).filter((q) => !q.flagged_broken);
+  const total = counted.length;
+  const correct = counted.filter((q) => q.is_correct).length;
+  const scorePct = total > 0 ? Math.round((100 * correct) / total) : 0;
+  await admin.from('quiz_sessions').update({ score: scorePct }).eq('id', sessionId);
+  return scorePct;
+}
+
+/** Recomputes a user's `topic_mastery` row for one domain/topic from scratch,
+ *  across every completed session on that topic — rather than incrementally
+ *  patching it once at `finishSession` time. This is what keeps mastery stats
+ *  correct after a retroactive edit (a `validateQuestion` correction, or a
+ *  question later flagged broken): re-deriving from the current state of
+ *  `quiz_questions` is the only way those edits actually propagate, and
+ *  `flagged_broken` rows are excluded from both attempts and correct counts. */
+async function recomputeTopicMastery(admin, userId, domain, topic) {
+  const { data: sessions } = await admin
+    .from('quiz_sessions')
+    .select('id, taken_at')
+    .eq('user_id', userId)
+    .eq('domain', domain)
+    .eq('topic', topic)
+    .eq('completed', true);
+  const sessionIds = (sessions ?? []).map((s) => s.id);
+
+  let attempts = 0;
+  let correct = 0;
+  let avgTime = 0;
+  if (sessionIds.length > 0) {
+    const { data: qs } = await admin.from('quiz_questions').select('is_correct, flagged_broken, time_spent_seconds').in('quiz_session_id', sessionIds);
+    const counted = (qs ?? []).filter((q) => !q.flagged_broken);
+    attempts = counted.length;
+    correct = counted.filter((q) => q.is_correct).length;
+    const totalTime = counted.reduce((sum, q) => sum + (q.time_spent_seconds || 0), 0);
+    avgTime = attempts > 0 ? totalTime / attempts : 0;
+  }
+  const masteryScore = attempts > 0 ? Math.round((100 * correct) / attempts) : 0;
+  const lastPracticedAt = (sessions ?? []).reduce((latest, s) => (!latest || new Date(s.taken_at) > new Date(latest) ? s.taken_at : latest), null);
+
+  await admin.from('topic_mastery').upsert(
+    {
+      user_id: userId,
+      domain,
+      topic,
+      attempts_count: attempts,
+      correct_count: correct,
+      avg_time_seconds: avgTime,
+      mastery_score: masteryScore,
+      last_practiced_at: lastPracticedAt,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,domain,topic' }
+  );
+}
+
 /**
  * "Validate" — independently re-solve the question, check the stored answer key,
- * and persist the verified result: the question's `correct_option`/`explanation`
- * are updated to the validated answer and `is_correct` is recomputed for the
- * user's original pick, so the History record reflects the corrected answer.
+ * and persist the verified result. Two outcomes:
+ * - The key was just mis-marked: `correct_option`/`explanation` are updated to the
+ *   validated answer and `is_correct` is recomputed for the user's original pick.
+ * - No listed option is actually correct (the question itself is flawed): the
+ *   question is marked `flagged_broken` and excluded from scoring (`is_correct`
+ *   and `correct_option` cleared to null) rather than "corrected" to a still-wrong
+ *   letter. Either way, the owning session's score and the topic's mastery stats
+ *   are recomputed so History and the Journey metrics panel stay accurate.
  */
 export async function validateQuestion(userId, { questionId }) {
   if (!questionId) throw new BadRequestError('questionId is required.');
@@ -381,25 +447,40 @@ export async function validateQuestion(userId, { questionId }) {
   const result = await validateGeneratedQuestion({ provider, model, apiKey, question });
 
   const storedCorrectOption = String(question.correct_option ?? '').trim().toUpperCase();
-  const updatedCorrectOption = result.independentAnswer;
+  const flaggedBroken = result.independentAnswer === 'NONE';
+  const updatedCorrectOption = flaggedBroken ? null : result.independentAnswer;
   const updatedExplanation = result.explanation || question.explanation || '';
-  const isCorrect = question.chosen_option ? String(question.chosen_option).trim().toUpperCase() === updatedCorrectOption : question.is_correct;
+  const isCorrect = flaggedBroken
+    ? null
+    : question.chosen_option
+    ? String(question.chosen_option).trim().toUpperCase() === updatedCorrectOption
+    : question.is_correct;
 
+  const validatedAt = new Date().toISOString();
   const { error } = await admin
     .from('quiz_questions')
-    .update({ correct_option: updatedCorrectOption, explanation: updatedExplanation, is_correct: isCorrect })
+    .update({ correct_option: updatedCorrectOption, explanation: updatedExplanation, is_correct: isCorrect, flagged_broken: flaggedBroken, validated_at: validatedAt })
     .eq('id', questionId);
   if (error) throw error;
 
+  const { data: session } = await admin.from('quiz_sessions').select('id, domain, topic, completed').eq('id', question.quiz_session_id).maybeSingle();
+  if (session?.completed) {
+    await recomputeSessionScore(admin, session.id);
+    if (session.domain && session.topic) await recomputeTopicMastery(admin, userId, session.domain, session.topic);
+  }
+
   return {
     independentAnswer: result.independentAnswer,
-    keyIsCorrect: result.keyIsCorrect,
+    keyIsCorrect: flaggedBroken ? false : result.keyIsCorrect,
     verdict: result.verdict,
+    correctAnswerText: result.correctAnswerText || null,
     storedCorrectOption,
     updatedCorrectOption,
     updatedExplanation,
     isCorrect,
-    changed: storedCorrectOption !== updatedCorrectOption,
+    flaggedBroken,
+    validatedAt,
+    changed: flaggedBroken || storedCorrectOption !== updatedCorrectOption,
   };
 }
 
@@ -444,37 +525,10 @@ export async function finishSession(userId, { sessionId }) {
 
   let outcome = null;
   if (resolvedDomain && resolvedTopic) {
-    const { data: existingMastery } = await admin
-      .from('topic_mastery')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('domain', resolvedDomain)
-      .eq('topic', resolvedTopic)
-      .maybeSingle();
-
-    const prevAttempts = existingMastery?.attempts_count ?? 0;
-    const prevCorrect = existingMastery?.correct_count ?? 0;
-    const prevAvgTime = existingMastery?.avg_time_seconds ?? 0;
-
-    const newAttempts = prevAttempts + total;
-    const newCorrect = prevCorrect + correct;
-    const newAvgTime = newAttempts > 0 ? (prevAvgTime * prevAttempts + timeTakenSeconds) / newAttempts : 0;
-    const masteryScore = newAttempts > 0 ? Math.round((100 * newCorrect) / newAttempts) : 0;
-
-    await admin.from('topic_mastery').upsert(
-      {
-        user_id: userId,
-        domain: resolvedDomain,
-        topic: resolvedTopic,
-        attempts_count: newAttempts,
-        correct_count: newCorrect,
-        avg_time_seconds: newAvgTime,
-        mastery_score: masteryScore,
-        last_practiced_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,domain,topic' }
-    );
+    // Same recompute-from-scratch path `validateQuestion` uses, so a later
+    // correction/flag on any of this topic's questions stays in sync with
+    // this initial mastery write rather than two logic paths drifting apart.
+    await recomputeTopicMastery(admin, userId, resolvedDomain, resolvedTopic);
   }
 
   if (session.journey_id && session.session_type === 'calibration') {

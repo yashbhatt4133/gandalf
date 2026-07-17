@@ -103,6 +103,8 @@ export interface QuizQuestion {
   difficulty: Difficulty;
   order_index: number;
   tags: string[];
+  flagged_broken: boolean;
+  validated_at: string | null;
 }
 
 /** Question shape as delivered to the browser — no answer key. */

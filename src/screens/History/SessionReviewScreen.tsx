@@ -14,6 +14,14 @@ import type { QuizQuestion, QuizSession } from '../../types/db';
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D'] as const;
 
+const PROVIDER_NAMES: Record<string, string> = { ollama: 'Local', groq: 'Groq', openai: 'OpenAI', gemini: 'Gemini' };
+
+function formatGeneratedBy(providerId: string | null, model: string | null): string | null {
+  if (!providerId) return null;
+  const name = PROVIDER_NAMES[providerId] ?? providerId;
+  return model ? `${name} · ${model}` : name;
+}
+
 export function SessionReviewScreen() {
   const { sessionId } = useParams();
   const [data, setData] = useState<{ session: QuizSession; questions: QuizQuestion[] } | null>(null);
@@ -60,7 +68,7 @@ export function SessionReviewScreen() {
 
       <div className="flex flex-col gap-4">
         {questions.map((initial, i) => (
-          <ReviewQuestion key={initial.id} initial={initial} index={i} />
+          <ReviewQuestion key={initial.id} initial={initial} index={i} generatedBy={formatGeneratedBy(session.provider_used, session.model_used)} />
         ))}
       </div>
 
@@ -77,10 +85,10 @@ type ModalState =
   | { kind: 'explain'; loading: boolean; error: string | null; text: string | null }
   | { kind: 'validate'; loading: boolean; error: string | null; result: ValidationResult | null };
 
-function ReviewQuestion({ initial, index }: { initial: QuizQuestion; index: number }) {
+function ReviewQuestion({ initial, index, generatedBy }: { initial: QuizQuestion; index: number; generatedBy: string | null }) {
   const [q, setQ] = useState<QuizQuestion>(initial);
   const [modal, setModal] = useState<ModalState | null>(null);
-  const [validated, setValidated] = useState(false);
+  const validated = !!q.validated_at;
 
   async function handleExplain() {
     setModal({ kind: 'explain', loading: true, error: null, text: null });
@@ -96,9 +104,15 @@ function ReviewQuestion({ initial, index }: { initial: QuizQuestion; index: numb
     setModal({ kind: 'validate', loading: true, error: null, result: null });
     try {
       const result = await validateQuestion(q.id);
-      // Reflect the persisted correction on the card behind the popup.
-      setQ((prev) => ({ ...prev, correct_option: result.updatedCorrectOption, explanation: result.updatedExplanation, is_correct: result.isCorrect }));
-      setValidated(true);
+      // Reflect the persisted correction (or flaw flag) on the card behind the popup.
+      setQ((prev) => ({
+        ...prev,
+        correct_option: result.updatedCorrectOption ?? undefined,
+        explanation: result.updatedExplanation,
+        is_correct: result.isCorrect,
+        flagged_broken: result.flaggedBroken,
+        validated_at: result.validatedAt,
+      }));
       setModal({ kind: 'validate', loading: false, error: null, result });
     } catch (err) {
       setModal({ kind: 'validate', loading: false, error: err instanceof Error ? err.message : 'Could not validate this question.', result: null });
@@ -110,10 +124,16 @@ function ReviewQuestion({ initial, index }: { initial: QuizQuestion; index: numb
       <div className="mb-3 flex items-center gap-2.5">
         <TierChip tier={q.difficulty} />
         <span className="text-[12.5px] text-text-muted">Question {index + 1}</span>
-        {validated && (
-          <span className="rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: 'var(--good)', background: 'color-mix(in srgb, var(--good) 12%, transparent)' }}>
-            Validated
+        {q.flagged_broken ? (
+          <span className="rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: 'var(--accent-2)', background: 'color-mix(in srgb, var(--accent-2) 15%, transparent)' }}>
+            Flawed question
           </span>
+        ) : (
+          validated && (
+            <span className="rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: 'var(--good)', background: 'color-mix(in srgb, var(--good) 12%, transparent)' }}>
+              Validated
+            </span>
+          )
         )}
       </div>
 
@@ -121,19 +141,27 @@ function ReviewQuestion({ initial, index }: { initial: QuizQuestion; index: numb
 
       {q.question_type === 'predict_output' && q.code_snippet && <pre className="code-block mono">{q.code_snippet}</pre>}
 
+      {q.flagged_broken && (
+        <p className="mb-3 rounded-lg border p-2.5 text-[13px]" style={{ borderColor: 'var(--accent-2)', background: 'color-mix(in srgb, var(--accent-2) 8%, transparent)', color: 'var(--text)' }}>
+          None of the options below is actually correct — this question was flagged during validation and excluded from your scores. See the explanation for the true answer.
+        </p>
+      )}
+
       <div className="mb-3 flex flex-col gap-2">
         {OPTION_LETTERS.map((letter) => {
           const text = q.options[letter];
           if (!text) return null;
+          const isCorrectOption = !q.flagged_broken && letter === q.correct_option;
+          const isChosen = letter === q.chosen_option;
           let cls = 'option-row';
-          if (letter === q.correct_option) cls += ' correct';
-          else if (letter === q.chosen_option) cls += ' incorrect';
+          if (isCorrectOption) cls += ' correct';
+          else if (isChosen && !q.flagged_broken) cls += ' incorrect';
           return (
             <div key={letter} className={cls}>
               <span className="letter">{letter}</span>
               <span className="flex-1">{text}</span>
-              {letter === q.correct_option && <span className="text-[11.5px] font-bold text-good">Correct</span>}
-              {letter !== q.correct_option && letter === q.chosen_option && <span className="text-[11.5px] font-bold text-danger">Your answer</span>}
+              {isCorrectOption && <span className="text-[11.5px] font-bold text-good">Correct</span>}
+              {isChosen && !isCorrectOption && <span className={`text-[11.5px] font-bold ${q.flagged_broken ? 'text-text-muted' : 'text-danger'}`}>Your answer</span>}
             </div>
           );
         })}
@@ -145,13 +173,14 @@ function ReviewQuestion({ initial, index }: { initial: QuizQuestion; index: numb
         </div>
       )}
 
-      {q.tags.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
+      {(q.tags.length > 0 || generatedBy) && (
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
           {q.tags.map((t) => (
             <span key={t} className="chip">
               {t}
             </span>
           ))}
+          {generatedBy && <span className="ml-auto text-[11px] text-text-dim">Generated by: {generatedBy}</span>}
         </div>
       )}
 
@@ -199,21 +228,33 @@ function ReviewModal({ modal, onClose }: { modal: ModalState; onClose: () => voi
             <div
               className="mb-3 rounded-xl border p-3.5"
               style={
-                modal.result.keyIsCorrect
+                modal.result.flaggedBroken
+                  ? { borderColor: 'var(--accent-2)', background: 'color-mix(in srgb, var(--accent-2) 8%, transparent)' }
+                  : modal.result.keyIsCorrect
                   ? { borderColor: 'var(--good)', background: 'color-mix(in srgb, var(--good) 8%, transparent)' }
                   : { borderColor: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, transparent)' }
               }
             >
-              <div className="mb-1 font-mono text-[11px] font-bold uppercase tracking-wide" style={{ color: modal.result.keyIsCorrect ? 'var(--good)' : 'var(--danger)' }}>
-                {modal.result.keyIsCorrect ? 'Answer key verified' : 'Answer key was wrong'}
+              <div
+                className="mb-1 font-mono text-[11px] font-bold uppercase tracking-wide"
+                style={{ color: modal.result.flaggedBroken ? 'var(--accent-2)' : modal.result.keyIsCorrect ? 'var(--good)' : 'var(--danger)' }}
+              >
+                {modal.result.flaggedBroken ? 'Question flagged — no correct option' : modal.result.keyIsCorrect ? 'Answer key verified' : 'Answer key was wrong'}
               </div>
               <p>{modal.result.verdict}</p>
             </div>
 
-            {modal.result.changed && (
+            {modal.result.flaggedBroken ? (
               <p className="mb-2 text-[13px] font-semibold text-text">
-                Corrected: {modal.result.storedCorrectOption} → {modal.result.updatedCorrectOption}. This has been saved to your history.
+                None of the four listed options is actually correct{modal.result.correctAnswerText ? ` — the true answer is: ${modal.result.correctAnswerText}` : ''}. This question has been
+                flagged and excluded from your session score and topic mastery stats.
               </p>
+            ) : (
+              modal.result.changed && (
+                <p className="mb-2 text-[13px] font-semibold text-text">
+                  Corrected: {modal.result.storedCorrectOption} → {modal.result.updatedCorrectOption}. This has been saved to your history.
+                </p>
+              )
             )}
 
             {modal.result.updatedExplanation && <p className="text-text-muted">{modal.result.updatedExplanation}</p>}

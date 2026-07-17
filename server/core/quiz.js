@@ -190,7 +190,9 @@ Write plain prose, 3-6 sentences. Do NOT repeat the full question or re-list the
   return text;
 }
 
-/** Defensive parse of the validator's single JSON object. */
+/** Defensive parse of the validator's single JSON object. `independent_answer`
+ *  may be "NONE" when the question itself is flawed (no listed option is
+ *  actually correct) — in that case `correct_answer_text` must be non-empty. */
 export function parseValidation(raw) {
   let t = (raw || '').trim();
   const fenced = t.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -201,9 +203,12 @@ export function parseValidation(raw) {
   try {
     const o = JSON.parse(t);
     const ans = String(o.independent_answer ?? '').trim().toUpperCase();
-    if (!['A', 'B', 'C', 'D'].includes(ans)) return null;
+    if (!['A', 'B', 'C', 'D', 'NONE'].includes(ans)) return null;
+    const correctAnswerText = typeof o.correct_answer_text === 'string' ? o.correct_answer_text.trim() : '';
+    if (ans === 'NONE' && !correctAnswerText) return null;
     return {
       independentAnswer: ans,
+      correctAnswerText: ans === 'NONE' ? correctAnswerText : '',
       verdict: typeof o.verdict === 'string' ? o.verdict.trim() : '',
       explanation: typeof o.explanation === 'string' ? o.explanation.trim() : '',
     };
@@ -216,6 +221,10 @@ export function parseValidation(raw) {
  * Independently re-solves a question and checks the stored answer key — for the
  * "Validate" button. Whether the key is correct is derived from the validator's
  * independent answer vs. the stored `correct_option`, not the model's own boolean.
+ * If none of the four listed options is actually correct, the question itself is
+ * flawed — the validator reports "NONE" rather than being forced to pick the
+ * closest option, and the caller flags the question instead of "correcting" it
+ * to a still-wrong letter.
  */
 export async function validateGeneratedQuestion({ provider, model, apiKey, question }) {
   const codeBlock = question.code_snippet ? `\n\nCode snippet:\n${question.code_snippet}` : '';
@@ -227,10 +236,13 @@ ${formatOptions(question.options)}
 
 The answer key currently claims the correct option is "${question.correct_option}"${question.explanation ? ` with the explanation: "${question.explanation}"` : ''}.
 
+IMPORTANT: If your independently-solved answer does not match ANY of the four listed options — the question itself is flawed, not just mis-keyed — do NOT force-pick the closest option. Instead set "independent_answer" to "NONE" and put the actual correct value in "correct_answer_text".
+
 Return ONLY a JSON object (no markdown fences, no extra prose) shaped exactly:
 {
-  "independent_answer": "A" | "B" | "C" | "D",
-  "verdict": "one concise sentence: confirm the key, or state which option is actually correct and why the key is wrong",
+  "independent_answer": "A" | "B" | "C" | "D" | "NONE",
+  "correct_answer_text": "only when independent_answer is NONE — the actual correct value, in plain terms",
+  "verdict": "one concise sentence: confirm the key, state which option is actually correct and why the key is wrong, or state plainly that none of the options is correct",
   "explanation": "a correct, clear 2-4 sentence explanation of the truly correct answer"
 }`;
 

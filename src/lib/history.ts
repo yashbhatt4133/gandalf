@@ -25,6 +25,15 @@ export async function listCompletedSessions(userId: string, filters: HistoryFilt
   return data ?? [];
 }
 
+/** Session ids that contain at least one question flagged during "Validate" as
+ *  having no correct option among its choices — powers the History list's
+ *  "flawed question" indicator so those sessions are easy to spot again. */
+export async function listFlaggedSessionIds(userId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.from('quiz_questions').select('quiz_session_id').eq('user_id', userId).eq('flagged_broken', true);
+  if (error) throw error;
+  return new Set((data ?? []).map((r) => r.quiz_session_id));
+}
+
 /** Distinct, non-null topics across the user's completed sessions — powers the History topic filter. */
 export async function listDistinctTopics(userId: string): Promise<string[]> {
   const { data, error } = await supabase.from('quiz_sessions').select('topic').eq('user_id', userId).eq('completed', true);
