@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './lib/AuthContext';
 import { ProfileProvider } from './lib/ProfileContext';
 import { ProviderBadgeProvider } from './lib/ProviderBadgeContext';
+import { ToastProvider } from './lib/ToastContext';
+import { PageTitleProvider } from './lib/PageTitleContext';
 import { RequireSession } from './components/RequireSession';
 import { RequireOnboarded } from './components/RequireOnboarded';
 import { AppShell } from './components/layout/AppShell';
@@ -24,6 +26,8 @@ export default function App() {
       <AuthProvider>
         <ProfileProvider>
           <ProviderBadgeProvider>
+           <ToastProvider>
+            <PageTitleProvider>
             <Routes>
               <Route path="/auth" element={<AuthScreen />} />
 
@@ -50,6 +54,8 @@ export default function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
+            </PageTitleProvider>
+           </ToastProvider>
           </ProviderBadgeProvider>
         </ProfileProvider>
       </AuthProvider>

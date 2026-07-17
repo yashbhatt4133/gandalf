@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { useAuth } from '../../lib/AuthContext';
 import { useProfile } from '../../lib/ProfileContext';
+import { useToast } from '../../lib/ToastContext';
 import { addInterest, getInterests, removeInterest, upsertProfile } from '../../lib/profile';
 import { parseCv } from '../../lib/api';
 import type { ExperienceLevel, TargetRole, UserInterest } from '../../types/db';
@@ -15,6 +16,7 @@ const INTEREST_SUGGESTIONS = ['Chess', 'Gaming', 'Movies', 'Football', 'Cricket'
 export function ProfileForm({ onSaved }: { onSaved?: () => void }) {
   const { session } = useAuth();
   const { profile, refresh } = useProfile();
+  const { show: showToast } = useToast();
   const userId = session!.user.id;
 
   const [displayName, setDisplayName] = useState('');
@@ -108,6 +110,7 @@ export function ProfileForm({ onSaved }: { onSaved?: () => void }) {
       });
       refresh();
       setSavedMsg(true);
+      showToast('Profile saved');
       onSaved?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save your profile.');

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { ChipSelect } from '../../components/ui/ChipSelect';
 import { DomainChip } from '../../components/ui/Chip';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { usePageTitle } from '../../lib/PageTitleContext';
 import { useAuth } from '../../lib/AuthContext';
 import { listCompletedSessions, listDistinctTags, listDistinctTopics } from '../../lib/history';
 import type { QuizSession, SessionType } from '../../types/db';
@@ -27,6 +29,7 @@ export function HistoryScreen() {
   const [sessions, setSessions] = useState<QuizSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  usePageTitle('History');
 
   useEffect(() => {
     Promise.all([listDistinctTopics(userId), listDistinctTags(userId)]).then(([t, g]) => {
@@ -63,7 +66,13 @@ export function HistoryScreen() {
       </Card>
 
       {error && <p className="mb-4 text-[13px] text-danger">{error}</p>}
-      {loading && <p className="text-[13px] text-text-muted">Loading…</p>}
+      {loading && (
+        <div className="flex flex-col gap-3">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-[68px] w-full" />
+          ))}
+        </div>
+      )}
 
       {!loading && sessions.length === 0 && <p className="text-[13px] text-text-muted">No sessions match these filters yet.</p>}
 

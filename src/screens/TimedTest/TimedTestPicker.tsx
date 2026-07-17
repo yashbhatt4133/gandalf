@@ -6,6 +6,7 @@ import { DomainChip } from '../../components/ui/Chip';
 import { TopicPicker } from '../../components/TopicPicker';
 import { PreQuizFeedback, defaultPreQuizPrefs, preQuizPrefsToParams } from '../../components/PreQuizFeedback';
 import { generateQuiz } from '../../lib/api';
+import { usePageTitle } from '../../lib/PageTitleContext';
 import type { QuizRunnerState } from '../Quiz/QuizRunner';
 
 const QUESTION_COUNTS = [5, 10, 15, 20];
@@ -20,6 +21,7 @@ export function TimedTestPicker() {
   // lock it (no re-picking) and tie the session back to the journey.
   const journeyId = params.get('journeyId') || undefined;
   const locked = params.get('locked') === '1' && !!domain && !!topic.trim();
+  usePageTitle('Time-Bound Test');
   const [questionCount, setQuestionCount] = useState(10);
   const [customCount, setCustomCount] = useState(false);
   const [timeLimitMin, setTimeLimitMin] = useState(10);

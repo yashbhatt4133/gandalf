@@ -24,6 +24,11 @@ function JourneyNavItem({ id, topic, domain }: { id: string; topic: string; doma
   );
 }
 
+const navItemClass = ({ isActive }: { isActive: boolean }) =>
+  `mb-1 block rounded-lg px-2.5 py-2.5 text-[13px] font-semibold transition-colors ${isActive ? '' : 'text-text-muted hover:bg-panel-2'}`;
+const navItemStyle = ({ isActive }: { isActive: boolean }) =>
+  isActive ? { background: 'rgba(139,92,246,0.16)', color: 'var(--text)' } : undefined;
+
 export function Sidebar() {
   const { journeys, refresh } = useJourneys();
   const [modalOpen, setModalOpen] = useState(false);
@@ -35,12 +40,7 @@ export function Sidebar() {
         + Start new practice
       </Button>
 
-      <NavLink
-        to="/dashboard"
-        end
-        className={({ isActive }) => `mb-1 mt-6 block rounded-lg px-2.5 py-2.5 text-[13px] font-semibold transition-colors ${isActive ? '' : 'text-text-muted hover:bg-panel-2'}`}
-        style={({ isActive }) => (isActive ? { background: 'rgba(139,92,246,0.16)', color: 'var(--text)' } : undefined)}
-      >
+      <NavLink to="/dashboard" end className={(s) => `mt-6 ${navItemClass(s)}`} style={navItemStyle}>
         Home
       </NavLink>
 
@@ -51,16 +51,16 @@ export function Sidebar() {
       ))}
 
       <div className="mb-2.5 mt-6 font-mono text-[11.5px] font-bold uppercase tracking-wide text-text-dim">Practice</div>
-      <NavLink to="/timed-test" className="mb-1 block rounded-lg px-2.5 py-2.5 text-[13px] font-semibold text-text-muted hover:bg-panel-2">
+      <NavLink to="/timed-test" className={navItemClass} style={navItemStyle}>
         Time-Bound Test
       </NavLink>
-      <NavLink to="/adaptive-quiz" className="mb-1 block rounded-lg px-2.5 py-2.5 text-[13px] font-semibold text-text-muted hover:bg-panel-2">
+      <NavLink to="/adaptive-quiz" className={navItemClass} style={navItemStyle}>
         Adaptive Quiz
       </NavLink>
-      <NavLink to="/history" className="mb-1 block rounded-lg px-2.5 py-2.5 text-[13px] font-semibold text-text-muted hover:bg-panel-2">
+      <NavLink to="/history" className={navItemClass} style={navItemStyle}>
         History
       </NavLink>
-      <NavLink to="/settings" className="mb-1 block rounded-lg px-2.5 py-2.5 text-[13px] font-semibold text-text-muted hover:bg-panel-2">
+      <NavLink to="/settings" className={navItemClass} style={navItemStyle}>
         Profile / Settings
       </NavLink>
 

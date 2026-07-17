@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { ModalClose } from '../../components/ui/ModalClose';
+import { useModal } from '../../lib/useModal';
 import { TopicPicker, type CustomFocus } from '../../components/TopicPicker';
 import { GeneratingChecklist } from '../../components/GeneratingChecklist';
 import { GandalfMark } from '../../components/ui/GandalfMark';
@@ -33,6 +35,17 @@ export function NewJourneyModal({ onClose, onCreated }: { onClose: () => void; o
   const [error, setError] = useState<string | null>(null);
 
   const ready = !!domain && !!topic.trim() && (!focus || !!focus.role.trim());
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  useModal(overlayRef, onClose, !generating);
+
+  // Enter starts the journey from a single-line input (not the description textarea).
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT' && ready && !generating) {
+      e.preventDefault();
+      handleStart();
+    }
+  }
 
   async function handleStart() {
     if (!ready) return;
@@ -70,8 +83,15 @@ export function NewJourneyModal({ onClose, onCreated }: { onClose: () => void; o
   // descendants — without the portal the overlay anchors to the sidebar and
   // shows up as a narrow side panel instead of a centered popup.)
   return createPortal(
-    <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <Card className="max-h-[85vh] w-full max-w-lg overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div
+      ref={overlayRef}
+      tabIndex={-1}
+      onKeyDown={handleKeyDown}
+      className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <Card role="dialog" aria-modal="true" className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        {!generating && <ModalClose onClick={onClose} />}
         {generating ? (
           <>
             <GandalfMark size={72} className="mx-auto mb-2 block" />

@@ -5,12 +5,14 @@ import { DomainChip } from '../../components/ui/Chip';
 import { StatusPill } from '../../components/ui/Chip';
 import { ProgressBar } from '../../components/ui/ProgressBar';
 import { Card } from '../../components/ui/Card';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { useAuth } from '../../lib/AuthContext';
 import { useProfile } from '../../lib/ProfileContext';
 import { useJourneys } from '../../lib/JourneysContext';
 import { listQuizSessions, listTopicMastery } from '../../lib/journeys';
 import { computeCurrentStreak, computeLongestStreak } from '../../lib/stats';
 import { useJourneyProgress } from '../../lib/useJourneyProgress';
+import { usePageTitle } from '../../lib/PageTitleContext';
 import type { TopicMastery } from '../../types/db';
 
 function JourneyCard({ id, topic, domain, status }: { id: string; topic: string; domain: string; status: 'active' | 'mastered' | 'abandoned' }) {
@@ -38,6 +40,7 @@ export function DashboardHome() {
   const { journeys, loading, refresh: refreshJourneys } = useJourneys();
   const [mastery, setMastery] = useState<TopicMastery[]>([]);
   const [streaks, setStreaks] = useState({ current: 0, longest: 0 });
+  usePageTitle('Home');
 
   useEffect(() => {
     if (!session) return;
@@ -74,6 +77,13 @@ export function DashboardHome() {
       </div>
 
       <div className="mb-3.5 font-mono text-[12.5px] font-bold uppercase tracking-wide text-text-dim">Active journeys</div>
+      {loading && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-[132px] w-full" />
+          ))}
+        </div>
+      )}
       {!loading && journeys.length === 0 && (
         <Card className="text-center text-text-muted">No journeys yet — click "+ Start new practice" in the sidebar to begin one.</Card>
       )}

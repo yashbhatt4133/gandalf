@@ -4,6 +4,7 @@ import { ProfileForm } from '../Profile/ProfileForm';
 import { AiProviderTab } from './AiProviderTab';
 import { Button } from '../../components/ui/Button';
 import { useProfile } from '../../lib/ProfileContext';
+import { usePageTitle } from '../../lib/PageTitleContext';
 import { signOut } from '../../lib/session';
 
 export function SettingsScreen() {
@@ -11,6 +12,7 @@ export function SettingsScreen() {
   const [loggingOut, setLoggingOut] = useState(false);
   const { profile } = useProfile();
   const navigate = useNavigate();
+  usePageTitle('Profile / Settings');
 
   async function handleLogout() {
     setLoggingOut(true);

@@ -4,6 +4,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { TierChip } from '../../components/ui/Chip';
 import { getJourney, listRecommendedTopics, markRecommendedTopicDone, subscribeRecommendedTopics } from '../../lib/journeys';
+import { usePageTitle } from '../../lib/PageTitleContext';
 import type { Journey, RecommendedTopic } from '../../types/db';
 
 export function LearningScreen() {
@@ -12,6 +13,7 @@ export function LearningScreen() {
   const [topics, setTopics] = useState<RecommendedTopic[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const cardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  usePageTitle(journey?.topic ? `${journey.topic} · Learning` : 'Learning');
 
   useEffect(() => {
     if (!journeyId) return;

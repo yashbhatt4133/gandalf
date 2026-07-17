@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { TopicPicker } from '../../components/TopicPicker';
 import { PreQuizFeedback, defaultPreQuizPrefs, preQuizPrefsToParams } from '../../components/PreQuizFeedback';
 import { generateQuiz } from '../../lib/api';
+import { usePageTitle } from '../../lib/PageTitleContext';
 import type { QuizRunnerState } from '../Quiz/QuizRunner';
 
 export function AdaptiveQuizScreen() {
@@ -14,6 +15,7 @@ export function AdaptiveQuizScreen() {
   const [prefs, setPrefs] = useState(defaultPreQuizPrefs());
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  usePageTitle('Adaptive Quiz');
 
   async function handleStart() {
     if (!domain || !topic.trim()) return;

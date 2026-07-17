@@ -3,10 +3,12 @@ import { ThemeToggle } from '../ui/ThemeToggle';
 import { GandalfMark } from '../ui/GandalfMark';
 import { useProviderBadge } from '../../lib/ProviderBadgeContext';
 import { useProfile } from '../../lib/ProfileContext';
+import { usePageTitleValue } from '../../lib/PageTitleContext';
 
 export function TopBar() {
   const { settings } = useProviderBadge();
   const { profile } = useProfile();
+  const pageTitle = usePageTitleValue();
 
   const initials =
     profile?.display_name
@@ -19,12 +21,20 @@ export function TopBar() {
 
   return (
     <div className="chrome-glass sticky top-0 z-10 flex items-center justify-between border-b border-border-soft px-7 py-3.5">
-      <Link to="/dashboard" className="flex items-center gap-2.5 text-[18px] font-bold tracking-tight">
-        <span className="flex h-10 w-10 items-center justify-center rounded-[11px] border border-border-soft bg-panel-2">
-          <GandalfMark size={30} />
-        </span>
-        Gandalf
-      </Link>
+      <div className="flex items-center gap-2.5 overflow-hidden">
+        <Link to="/dashboard" className="flex flex-shrink-0 items-center gap-2.5 text-[18px] font-bold tracking-tight">
+          <span className="flex h-10 w-10 items-center justify-center rounded-[11px] border border-border-soft bg-panel-2">
+            <GandalfMark size={30} />
+          </span>
+          Gandalf
+        </Link>
+        {pageTitle && (
+          <>
+            <span className="flex-shrink-0 text-text-dim">/</span>
+            <span className="truncate text-[14px] font-semibold text-text-muted">{pageTitle}</span>
+          </>
+        )}
+      </div>
       <div className="flex items-center gap-3">
         {settings?.badgeLabel && (
           <div className="flex items-center gap-2 rounded-full border border-border-soft bg-panel-2 py-1.5 pl-2.5 pr-3.5 text-[12.5px] font-medium text-text-muted">

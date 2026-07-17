@@ -153,6 +153,47 @@ pre {
   }
 }
 
+/* ================= Toast ================= */
+.toast {
+  animation: toast-in 0.18s ease-out;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ================= Loading skeleton ================= */
+.skeleton {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel-3) 75%, transparent);
+  animation: skeleton-pulse 1.3s ease-in-out infinite;
+}
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* ================= Modal close button ================= */
+.modal-close {
+  color: var(--text-dim);
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.modal-close:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
 /* ================= App chrome (top bar + sidebar) ================= */
 /* Frosted "glass" so the fixed cosmic background (stars + nebula) reads THROUGH
    the bars instead of a flat opaque panel that visibly clashes with the

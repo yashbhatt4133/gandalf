@@ -3,6 +3,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { getLlmSettings, saveLlmSettings, type LlmSettingsResponse } from '../../lib/api';
 import { useProviderBadge } from '../../lib/ProviderBadgeContext';
+import { useToast } from '../../lib/ToastContext';
 import type { ProviderId } from '../../types/db';
 
 const CUSTOM = '__custom__';
@@ -18,6 +19,7 @@ const isHostedBuild = import.meta.env.VITE_DEPLOYMENT_MODE === 'hosted';
 
 export function AiProviderTab() {
   const { refresh: refreshBadge } = useProviderBadge();
+  const { show: showToast } = useToast();
   const [settings, setSettings] = useState<LlmSettingsResponse | null>(null);
   const [provider, setProvider] = useState<ProviderId>('groq');
   const [model, setModel] = useState('');
@@ -54,6 +56,7 @@ export function AiProviderTab() {
       setSettings(fresh);
       refreshBadge();
       setSavedMsg(true);
+      showToast('Provider settings saved');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save your provider settings.');
     } finally {

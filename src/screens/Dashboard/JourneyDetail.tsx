@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { ModalClose } from '../../components/ui/ModalClose';
+import { useModal } from '../../lib/useModal';
 import { DomainChip, StatusPill } from '../../components/ui/Chip';
 import { PreQuizFeedback, defaultPreQuizPrefs, preQuizPrefsToParams } from '../../components/PreQuizFeedback';
 import { GeneratingChecklist } from '../../components/GeneratingChecklist';
 import { GandalfMark } from '../../components/ui/GandalfMark';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { getJourney, listJourneySteps } from '../../lib/journeys';
 import { generateQuiz, generateLearningVerticals, completeJourney } from '../../lib/api';
 import { useJourneys } from '../../lib/JourneysContext';
+import { usePageTitle } from '../../lib/PageTitleContext';
+import { useToast } from '../../lib/ToastContext';
 import type { Journey, JourneyStep, StepName } from '../../types/db';
 import type { QuizRunnerState } from '../Quiz/QuizRunner';
 import { MetricsPanel } from './MetricsPanel';
@@ -23,6 +28,7 @@ export function JourneyDetail() {
   const { journeyId } = useParams();
   const navigate = useNavigate();
   const { refresh: refreshJourneys } = useJourneys();
+  const { show: showToast } = useToast();
   const [journey, setJourney] = useState<Journey | null>(null);
   const [steps, setSteps] = useState<JourneyStep[]>([]);
   const [busyStep, setBusyStep] = useState<StepName | null>(null);
@@ -42,8 +48,28 @@ export function JourneyDetail() {
     load();
   }, [load]);
 
+  // Declared before the early return so the hook order stays stable.
+  const calOverlayRef = useRef<HTMLDivElement>(null);
+  const adaptiveOverlayRef = useRef<HTMLDivElement>(null);
+  useModal(calOverlayRef, () => setCalModalOpen(false), calModalOpen && busyStep !== 'quiz');
+  useModal(adaptiveOverlayRef, () => setAdaptiveModalOpen(false), adaptiveModalOpen && !adaptiveBusy);
+  usePageTitle(journey?.topic || 'Journey');
+
   if (!journey || !journeyId) {
-    return <Card className="max-w-lg text-text-muted">Loading journey…</Card>;
+    return (
+      <div className="max-w-3xl">
+        <Skeleton className="mb-2 h-5 w-24" />
+        <Skeleton className="mb-6 h-8 w-64" />
+        <Card className="mb-6">
+          <Skeleton className="mb-4 h-3.5 w-16" />
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   function openCalModal() {
@@ -123,6 +149,7 @@ export function JourneyDetail() {
       await completeJourney(journey!.id);
       load();
       refreshJourneys();
+      showToast('Journey marked complete');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not update the journey.');
     }
@@ -208,8 +235,9 @@ export function JourneyDetail() {
       <MetricsPanel userId={journey.user_id} domain={journey.domain} topic={journey.topic} />
 
       {calModalOpen && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4" onClick={() => !busyStep && setCalModalOpen(false)}>
-          <Card className="max-h-[85vh] w-full max-w-lg overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div ref={calOverlayRef} tabIndex={-1} className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4" onClick={() => !busyStep && setCalModalOpen(false)}>
+          <Card role="dialog" aria-modal="true" className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {busyStep !== 'quiz' && <ModalClose onClick={() => setCalModalOpen(false)} />}
             {busyStep === 'quiz' ? (
               <>
                 <GandalfMark size={72} className="mx-auto mb-2 block" />
@@ -237,8 +265,9 @@ export function JourneyDetail() {
       )}
 
       {adaptiveModalOpen && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4" onClick={() => !adaptiveBusy && setAdaptiveModalOpen(false)}>
-          <Card className="max-h-[85vh] w-full max-w-lg overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div ref={adaptiveOverlayRef} tabIndex={-1} className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4" onClick={() => !adaptiveBusy && setAdaptiveModalOpen(false)}>
+          <Card role="dialog" aria-modal="true" className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {!adaptiveBusy && <ModalClose onClick={() => setAdaptiveModalOpen(false)} />}
             {adaptiveBusy ? (
               <>
                 <GandalfMark size={72} className="mx-auto mb-2 block" />

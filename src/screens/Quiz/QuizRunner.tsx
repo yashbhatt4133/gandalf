@@ -6,6 +6,7 @@ import { TierChip } from '../../components/ui/Chip';
 import { answerQuestion, completeSession, completeJourney, generateAdaptiveQuestion, generateQuiz } from '../../lib/api';
 import { PostQuizFeedback } from '../../components/PostQuizFeedback';
 import { TAXONOMY } from '../../lib/taxonomy';
+import { usePageTitle } from '../../lib/PageTitleContext';
 import type { ClientQuizQuestion, SessionType } from '../../types/db';
 
 export interface QuizRunnerState {
@@ -41,6 +42,7 @@ export function QuizRunner() {
   const [result, setResult] = useState<{ score: number; total: number; timeTakenSeconds: number; outcome?: 'passed' | 'failed' | null; weakTags?: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(state?.timeLimitSeconds ?? null);
+  usePageTitle(state?.topic || 'Quiz');
 
   const current = questions[index];
   const answered = current ? answers[current.id] : undefined;

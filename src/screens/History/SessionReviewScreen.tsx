@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { ModalClose } from '../../components/ui/ModalClose';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { DomainChip, TierChip } from '../../components/ui/Chip';
 import { GandalfMark } from '../../components/ui/GandalfMark';
+import { useModal } from '../../lib/useModal';
+import { usePageTitle } from '../../lib/PageTitleContext';
 import { getSessionWithQuestions } from '../../lib/history';
 import { explainQuestion, validateQuestion, type ValidationResult } from '../../lib/api';
 import type { QuizQuestion, QuizSession } from '../../types/db';
@@ -14,6 +18,7 @@ export function SessionReviewScreen() {
   const { sessionId } = useParams();
   const [data, setData] = useState<{ session: QuizSession; questions: QuizQuestion[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  usePageTitle(data?.session.topic || 'Session review');
 
   useEffect(() => {
     if (!sessionId) return;
@@ -23,7 +28,18 @@ export function SessionReviewScreen() {
   }, [sessionId]);
 
   if (error) return <Card className="max-w-lg text-danger">{error}</Card>;
-  if (!data) return <Card className="max-w-lg text-text-muted">Loading…</Card>;
+  if (!data)
+    return (
+      <div className="max-w-2xl">
+        <Skeleton className="mb-3 h-4 w-28" />
+        <Skeleton className="mb-2 h-8 w-64" />
+        <Skeleton className="mb-6 h-4 w-40" />
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      </div>
+    );
 
   const { session, questions } = data;
 
@@ -48,9 +64,11 @@ export function SessionReviewScreen() {
         ))}
       </div>
 
-      <Button variant="ghost" className="mt-5" onClick={() => window.history.back()}>
-        Back
-      </Button>
+      <Link to="/history">
+        <Button variant="ghost" className="mt-5">
+          ← Back to History
+        </Button>
+      </Link>
     </div>
   );
 }
@@ -152,17 +170,17 @@ function ReviewQuestion({ initial, index }: { initial: QuizQuestion; index: numb
 }
 
 function ReviewModal({ modal, onClose }: { modal: ModalState; onClose: () => void }) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useModal(overlayRef, onClose);
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <Card className="max-h-[85vh] w-full max-w-lg overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between">
+    <div ref={overlayRef} tabIndex={-1} className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <Card role="dialog" aria-modal="true" className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <ModalClose onClick={onClose} />
+        <div className="mb-3 flex items-center justify-between pr-8">
           <div className="flex items-center gap-2.5">
             <GandalfMark size={34} />
             <h2 className="text-[15px] font-bold">{modal.kind === 'explain' ? 'Explanation' : 'Validation'}</h2>
           </div>
-          <button onClick={onClose} className="text-text-dim hover:text-text" aria-label="Close">
-            ×
-          </button>
         </div>
 
         {modal.loading && (
