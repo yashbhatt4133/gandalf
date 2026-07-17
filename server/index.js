@@ -24,6 +24,7 @@ import {
   explainQuestion,
   validateQuestion,
   generateVerticalsForJourney,
+  forceCompleteJourney,
 } from './core/sessions.js';
 
 const app = express();
@@ -117,6 +118,14 @@ app.post(
   asyncHandler(async (req, res) => {
     const user = await verifyUser(req.headers.authorization);
     res.json(await validateQuestion(user.id, req.body));
+  })
+);
+
+app.post(
+  '/api/complete-journey',
+  asyncHandler(async (req, res) => {
+    const user = await verifyUser(req.headers.authorization);
+    res.json(await forceCompleteJourney(user.id, req.body));
   })
 );
 

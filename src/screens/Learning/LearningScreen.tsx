@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -11,6 +11,7 @@ export function LearningScreen() {
   const [journey, setJourney] = useState<Journey | null>(null);
   const [topics, setTopics] = useState<RecommendedTopic[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const cardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   useEffect(() => {
     if (!journeyId) return;
@@ -24,7 +25,18 @@ export function LearningScreen() {
     });
   }, [journeyId]);
 
-  const selected = topics.find((t) => t.id === selectedId) ?? null;
+  const selectedIndex = topics.findIndex((t) => t.id === selectedId);
+  const selected = selectedIndex >= 0 ? topics[selectedIndex] : null;
+
+  function select(id: string) {
+    setSelectedId(id);
+    cardRefs.current[id]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
+
+  function step(delta: number) {
+    const next = topics[selectedIndex + delta];
+    if (next) select(next.id);
+  }
 
   async function handleMarkDone(id: string) {
     await markRecommendedTopicDone(id);
@@ -32,95 +44,141 @@ export function LearningScreen() {
   }
 
   return (
-    <div>
+    <div className="max-w-4xl">
       {journeyId && (
-        <Link to={`/journeys/${journeyId}`} className="mb-4 inline-block text-[12.5px] font-semibold text-text-muted hover:text-text">
-          ← {journey?.topic ?? 'Journey'}
+        <Link to={`/journeys/${journeyId}`} className="mb-4 inline-block font-mono text-[12px] font-semibold text-text-muted hover:text-text">
+          ← All steps
         </Link>
       )}
+
+      <div className="mb-1 font-mono text-[11.5px] font-bold uppercase tracking-wide text-accent-soft">Curated learning path</div>
+      <h1 className="mb-6 text-2xl font-extrabold tracking-tight">{journey?.topic ?? 'Learning'}</h1>
 
       {topics.length === 0 && <Card className="max-w-lg text-text-muted">No recommended topics yet — generate them from the journey page.</Card>}
 
       {topics.length > 0 && (
-        <div className="flex items-start gap-6">
-          <div className="w-64 flex-shrink-0">
-            <div className="mb-2 font-mono text-[11.5px] font-bold uppercase tracking-wide text-text-dim">Recommended for: {journey?.topic}</div>
-            <div className="flex flex-col gap-1">
-              {topics.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setSelectedId(t.id)}
-                  className="flex items-start gap-2.5 rounded-xl px-2.5 py-2.5 text-left transition-colors"
-                  style={{ background: selectedId === t.id ? 'rgba(139,92,246,0.16)' : undefined }}
-                >
-                  <span
-                    className="mt-0.5 flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold"
+        <>
+          {/* Numbered-card carousel navigation */}
+          <div className="mb-6 flex items-stretch gap-2">
+            <CarouselArrow dir="left" disabled={selectedIndex <= 0} onClick={() => step(-1)} />
+            <div className="flex flex-1 gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
+              {topics.map((t) => {
+                const active = t.id === selectedId;
+                return (
+                  <button
+                    key={t.id}
+                    ref={(el) => {
+                      cardRefs.current[t.id] = el;
+                    }}
+                    onClick={() => select(t.id)}
+                    className="flex w-[220px] flex-shrink-0 flex-col rounded-2xl border p-4 text-left transition-colors"
                     style={{
-                      background: selectedId === t.id ? 'var(--accent)' : 'var(--panel-3)',
-                      color: selectedId === t.id ? '#fff' : 'var(--text-muted)',
+                      borderColor: active ? 'var(--accent)' : 'var(--border-soft)',
+                      background: active ? 'rgba(139,92,246,0.10)' : 'var(--panel)',
                     }}
                   >
-                    {t.rank}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <TierChip tier={t.tier} />
-                    <div className="mt-1.5 truncate text-[13.5px] font-semibold">{t.title}</div>
-                  </div>
-                  <span
-                    className="mt-2.5 h-[9px] w-[9px] flex-shrink-0 rounded-full"
-                    style={t.status === 'done' ? { background: 'var(--good)' } : { border: '2px solid var(--border)' }}
-                  />
-                </button>
-              ))}
+                    <div className="mb-2 text-[26px] font-extrabold leading-none" style={{ color: active ? 'var(--accent)' : 'var(--text-dim)' }}>
+                      {String(t.rank).padStart(2, '0')}
+                    </div>
+                    <div className="mb-2">
+                      <TierChip tier={t.tier} />
+                    </div>
+                    <div className="mb-1.5 text-[13.5px] font-semibold leading-snug">{t.title}</div>
+                    {t.hook_question && <div className="line-clamp-3 text-[12px] italic text-text-muted">{t.hook_question}</div>}
+                    <span
+                      className="mt-2 h-[9px] w-[9px] rounded-full"
+                      style={t.status === 'done' ? { background: 'var(--good)' } : { border: '2px solid var(--border)' }}
+                    />
+                  </button>
+                );
+              })}
             </div>
+            <CarouselArrow dir="right" disabled={selectedIndex >= topics.length - 1} onClick={() => step(1)} />
           </div>
 
+          {/* Selected vertical content */}
           {selected && (
-            <div className="min-w-0 flex-1">
-              <div className="mb-5">
-                <TierChip tier={selected.tier} />
-                <h1 className="mb-2.5 mt-2.5 text-[26px] font-extrabold tracking-tight">{selected.title}</h1>
-                {selected.hook_question && <p className="max-w-xl text-[15px] text-text-muted">{selected.hook_question}</p>}
+            <Card>
+              <div className="mb-2 font-mono text-[11.5px] font-bold uppercase tracking-wide text-text-dim">
+                {selected.tier} · {selected.title}
               </div>
+              <h2 className="mb-5 text-[22px] font-extrabold leading-tight tracking-tight">{selected.hook_question || selected.title}</h2>
 
-              <div className="mb-6 flex flex-col gap-3.5">
-                <VBlock label="Definition">{selected.definition}</VBlock>
-                {selected.example && <VBlock label="Worked example">{selected.example}</VBlock>}
-                {selected.analogy && (
-                  <VBlock label={`Analogy${selected.analogy_interest ? ` · personalized to: ${selected.analogy_interest}` : ''}`}>{selected.analogy}</VBlock>
-                )}
-                {selected.scenario && <VBlock label="Real scenario">{selected.scenario}</VBlock>}
-                {selected.sources.length > 0 && (
-                  <VBlock label="Sources">
-                    <div className="flex flex-wrap gap-2">
-                      {selected.sources.map((s, i) => (
-                        <a key={i} href={s.url} target="_blank" rel="noreferrer" className="source-chip">
-                          ↗ {s.title}
-                        </a>
-                      ))}
-                    </div>
-                  </VBlock>
-                )}
-              </div>
-
-              {selected.status === 'todo' ? (
-                <Button onClick={() => handleMarkDone(selected.id)}>Mark as read</Button>
-              ) : (
-                <span className="text-[13px] font-semibold text-good">✓ Read</span>
+              {selected.analogy && (
+                <div className="mb-5 rounded-xl bg-panel-2 p-4" style={{ borderLeft: '3px solid var(--accent)' }}>
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-[11px] font-bold uppercase tracking-wide text-accent-soft">Gandalf's take</span>
+                    {selected.analogy_interest && <span className="chip">via your interest: {selected.analogy_interest}</span>}
+                  </div>
+                  <p className="text-[14.5px] leading-relaxed">{selected.analogy}</p>
+                </div>
               )}
-            </div>
+
+              <Section label="Definition">{selected.definition}</Section>
+
+              {selected.example && (
+                <div className="mb-5 rounded-xl border border-border-soft bg-panel-2 p-4">
+                  <div className="mb-1.5 font-mono text-[11px] font-bold uppercase tracking-wide text-text-dim">Worked example</div>
+                  <p className="text-[14px] leading-relaxed">{selected.example}</p>
+                </div>
+              )}
+
+              {selected.scenario && <Section label="Real scenario">{selected.scenario}</Section>}
+
+              {selected.sources.length > 0 && (
+                <div className="mb-5 border-t border-border-soft pt-4">
+                  <div className="mb-2 font-mono text-[11px] font-bold uppercase tracking-wide text-text-dim">Sources</div>
+                  <div className="flex flex-wrap gap-2">
+                    {selected.sources.map((s, i) => (
+                      <a key={i} href={s.url} target="_blank" rel="noreferrer" className="source-chip">
+                        {s.title}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 border-t border-border-soft pt-4">
+                {selected.status === 'todo' ? (
+                  <Button onClick={() => handleMarkDone(selected.id)}>Mark as read</Button>
+                ) : (
+                  <span className="mr-1 text-[13px] font-semibold text-good">Read</span>
+                )}
+                <div className="flex-1" />
+                <Button variant="ghost" onClick={() => step(-1)} disabled={selectedIndex <= 0}>
+                  ← Previous
+                </Button>
+                <Button variant="ghost" onClick={() => step(1)} disabled={selectedIndex >= topics.length - 1}>
+                  Next →
+                </Button>
+              </div>
+            </Card>
           )}
-        </div>
+        </>
       )}
     </div>
   );
 }
 
-function VBlock({ label, children }: { label: string; children: ReactNode }) {
+function CarouselArrow({ dir, disabled, onClick }: { dir: 'left' | 'right'; disabled: boolean; onClick: () => void }) {
   return (
-    <Card>
-      <h3 className="mb-2.5 flex items-center gap-2 font-mono text-[12.5px] font-bold uppercase tracking-wide text-accent-soft">{label}</h3>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={dir === 'left' ? 'Previous' : 'Next'}
+      className="flex w-9 flex-shrink-0 items-center justify-center rounded-xl border border-border-soft bg-panel text-text-muted transition-colors hover:bg-panel-2 disabled:cursor-not-allowed disabled:opacity-35"
+    >
+      {dir === 'left' ? '‹' : '›'}
+    </button>
+  );
+}
+
+function Section({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mb-5">
+      <div className="mb-1.5 font-mono text-[11px] font-bold uppercase tracking-wide text-accent-soft">{label}</div>
       <div className="text-[14.5px] leading-relaxed">{children}</div>
-    </Card>
+    </div>
   );
 }

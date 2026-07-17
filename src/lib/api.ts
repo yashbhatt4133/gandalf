@@ -81,10 +81,18 @@ export function completeSession(sessionId: string) {
     total: number;
     timeTakenSeconds: number;
     level: string;
-    outcome?: 'mastered' | 'read_more' | 'reset' | null;
+    outcome?: 'passed' | 'failed' | null;
+    weakTags?: string[];
   }>('/api/complete-session', {
     method: 'POST',
     body: JSON.stringify({ sessionId }),
+  });
+}
+
+export function completeJourney(journeyId: string) {
+  return apiFetch<{ ok: true }>('/api/complete-journey', {
+    method: 'POST',
+    body: JSON.stringify({ journeyId }),
   });
 }
 

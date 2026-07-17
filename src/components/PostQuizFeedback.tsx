@@ -11,7 +11,7 @@ export function PostQuizFeedback({ sessionId }: { sessionId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   if (status === 'done') {
-    return <p className="mt-5 text-[13px] text-text-muted">Thanks for the feedback 🙏</p>;
+    return <p className="mt-5 text-[13px] text-text-muted">Thanks for the feedback.</p>;
   }
 
   async function handleSubmit() {

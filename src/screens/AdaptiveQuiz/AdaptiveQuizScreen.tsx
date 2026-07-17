@@ -37,7 +37,7 @@ export function AdaptiveQuizScreen() {
 
   return (
     <div className="max-w-xl">
-      <h1 className="mb-1 text-2xl font-extrabold tracking-tight">🎯 Adaptive Quiz</h1>
+      <h1 className="mb-1 text-2xl font-extrabold tracking-tight">Adaptive Quiz</h1>
       <p className="mb-6 text-[14.5px] text-text-muted">Freeform, untimed practice — one question at a time, with an explanation right after each answer. Finish whenever you like.</p>
 
       <Card>

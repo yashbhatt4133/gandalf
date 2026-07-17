@@ -48,7 +48,7 @@ export function HistoryScreen() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="mb-1 text-2xl font-extrabold tracking-tight">🕘 History</h1>
+      <h1 className="mb-1 text-2xl font-extrabold tracking-tight">History</h1>
       <p className="mb-6 text-[14.5px] text-text-muted">Every past quiz, reassessment, and test — revisit them by topic or tag.</p>
 
       <Card className="mb-6">

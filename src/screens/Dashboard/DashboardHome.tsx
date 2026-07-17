@@ -48,6 +48,8 @@ export function DashboardHome() {
     });
   }, [session]);
 
+  const activeJourneys = journeys.filter((j) => j.status !== 'mastered');
+  const completedJourneys = journeys.filter((j) => j.status === 'mastered');
   const activeCount = journeys.filter((j) => j.status === 'active').length;
   const masteredCount = journeys.filter((j) => j.status === 'mastered').length;
   const totalAttempts = mastery.reduce((s, m) => s + m.attempts_count, 0);
@@ -62,20 +64,36 @@ export function DashboardHome() {
 
       <div className="mb-8 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <StatTile label="Active journeys" value={String(activeCount)} sub={`${masteredCount} mastered · ${journeys.length} total`} />
-        <StatTile label="Current streak" value={`${streaks.current} day${streaks.current === 1 ? '' : 's'}`} sub={`🔥 longest: ${streaks.longest} days`} good />
+        <StatTile label="Current streak" value={`${streaks.current} day${streaks.current === 1 ? '' : 's'}`} sub={`longest: ${streaks.longest} days`} good />
         <StatTile label="Overall accuracy" value={`${overallAccuracy}%`} sub={totalAttempts > 0 ? `across ${totalAttempts} questions` : 'no data yet'} />
         <StatTile label="Topics mastered" value={String(topicsMastered)} sub={`of ${mastery.length} attempted`} />
       </div>
 
-      <div className="mb-3.5 font-mono text-[12.5px] font-bold uppercase tracking-wide text-text-dim">Your journeys</div>
+      <div className="mb-3.5 font-mono text-[12.5px] font-bold uppercase tracking-wide text-text-dim">Active journeys</div>
       {!loading && journeys.length === 0 && (
         <Card className="text-center text-text-muted">No journeys yet — click "+ Start new practice" in the sidebar to begin one.</Card>
       )}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {journeys.map((j) => (
-          <JourneyCard key={j.id} id={j.id} topic={j.topic} domain={j.domain} status={j.status} />
-        ))}
-      </div>
+      {activeJourneys.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {activeJourneys.map((j) => (
+            <JourneyCard key={j.id} id={j.id} topic={j.topic} domain={j.domain} status={j.status} />
+          ))}
+        </div>
+      )}
+      {!loading && journeys.length > 0 && activeJourneys.length === 0 && (
+        <Card className="text-text-muted">All caught up — every journey is complete. Start a new one from the sidebar.</Card>
+      )}
+
+      {completedJourneys.length > 0 && (
+        <>
+          <div className="mb-3.5 mt-8 font-mono text-[12.5px] font-bold uppercase tracking-wide text-text-dim">Completed · {completedJourneys.length}</div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {completedJourneys.map((j) => (
+              <JourneyCard key={j.id} id={j.id} topic={j.topic} domain={j.domain} status={j.status} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

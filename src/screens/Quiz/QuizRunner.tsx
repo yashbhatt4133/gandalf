@@ -3,8 +3,9 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { TierChip } from '../../components/ui/Chip';
-import { answerQuestion, completeSession, generateAdaptiveQuestion } from '../../lib/api';
+import { answerQuestion, completeSession, completeJourney, generateAdaptiveQuestion, generateQuiz } from '../../lib/api';
 import { PostQuizFeedback } from '../../components/PostQuizFeedback';
+import { TAXONOMY } from '../../lib/taxonomy';
 import type { ClientQuizQuestion, SessionType } from '../../types/db';
 
 export interface QuizRunnerState {
@@ -37,7 +38,7 @@ export function QuizRunner() {
   const [questionStartedAt, setQuestionStartedAt] = useState(Date.now());
   const [loadingNext, setLoadingNext] = useState(false);
   const [finishing, setFinishing] = useState(false);
-  const [result, setResult] = useState<{ score: number; total: number; timeTakenSeconds: number; outcome?: string | null } | null>(null);
+  const [result, setResult] = useState<{ score: number; total: number; timeTakenSeconds: number; outcome?: 'passed' | 'failed' | null; weakTags?: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(state?.timeLimitSeconds ?? null);
 
@@ -138,7 +139,7 @@ export function QuizRunner() {
         </div>
         {remaining !== null && (
           <div className="rounded-full border border-border-soft bg-panel-2 px-3 py-1 font-mono text-[13px] font-semibold" style={{ color: remaining < 30 ? 'var(--danger)' : 'var(--text)' }}>
-            ⏱ {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
+            {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
           </div>
         )}
       </div>
@@ -167,9 +168,9 @@ export function QuizRunner() {
               <button key={letter} className={cls} disabled={!!answered} onClick={() => handleAnswer(letter)}>
                 <span className="letter">{letter}</span>
                 <span className="flex-1">{text}</span>
-                {answered && letter === answered.correctOption && <span className="text-[11.5px] font-bold text-good">✓ Correct</span>}
+                {answered && letter === answered.correctOption && <span className="text-[11.5px] font-bold text-good">Correct</span>}
                 {answered && letter !== answered.correctOption && letter === answered.chosenOption && (
-                  <span className="text-[11.5px] font-bold text-danger">✗ Your answer</span>
+                  <span className="text-[11.5px] font-bold text-danger">Your answer</span>
                 )}
               </button>
             );
@@ -199,22 +200,63 @@ export function QuizRunner() {
   );
 }
 
+/** An adjacent topic in the same domain, for the "start next journey" nudge. */
+function adjacentTopic(domain: string, topic: string): string | null {
+  const d = TAXONOMY.find((x) => x.domain === domain);
+  const next = d?.topics.find((t) => t.toLowerCase() !== topic.toLowerCase());
+  return next ?? null;
+}
+
 function ResultsView({
   result,
   state,
   sessionId,
   onNavigate,
 }: {
-  result: { score: number; total: number; timeTakenSeconds: number; outcome?: string | null };
+  result: { score: number; total: number; timeTakenSeconds: number; outcome?: 'passed' | 'failed' | null; weakTags?: string[] };
   state: QuizRunnerState;
   sessionId: string;
   onNavigate: ReturnType<typeof useNavigate>;
 }) {
-  const outcomeCopy: Record<string, string> = {
-    mastered: "You've mastered this topic — nice work. This journey is now marked complete.",
-    read_more: "You're close — a bit more review before this topic sticks. Check the recommended reading.",
-    reset: "This one needs a fresh pass — your completed reading has been reset so you can go through it again.",
-  };
+  const [busy, setBusy] = useState<'retake' | 'complete' | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const isReassessment = state.sessionType === 'reassessment';
+  const passed = result.outcome === 'passed';
+  const failed = result.outcome === 'failed';
+  const nudge = passed ? adjacentTopic(state.domain, state.topic) : null;
+
+  async function retakeReassessment() {
+    setBusy('retake');
+    setActionError(null);
+    try {
+      const { sessionId: sid, questions, timeLimitSeconds } = await generateQuiz({
+        sessionType: 'reassessment',
+        topic: state.topic,
+        domain: state.domain,
+        questionCount: 5,
+        journeyId: state.journeyId,
+      });
+      const next: QuizRunnerState = { questions, timeLimitSeconds, sessionType: 'reassessment', topic: state.topic, domain: state.domain, journeyId: state.journeyId };
+      onNavigate(`/journeys/${state.journeyId}/quiz/${sid}`, { state: next, replace: true });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not start the reassessment.');
+      setBusy(null);
+    }
+  }
+
+  async function continueAnyway() {
+    if (!state.journeyId) return;
+    setBusy('complete');
+    setActionError(null);
+    try {
+      await completeJourney(state.journeyId);
+      onNavigate(`/journeys/${state.journeyId}`);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not update the journey.');
+      setBusy(null);
+    }
+  }
 
   return (
     <Card className="max-w-lg text-center">
@@ -229,15 +271,56 @@ function ResultsView({
         {result.total} question{result.total === 1 ? '' : 's'} · {Math.round(result.timeTakenSeconds)}s total
       </div>
 
-      {result.outcome && <p className="mb-5 text-[14px] text-text-muted">{outcomeCopy[result.outcome]}</p>}
+      {isReassessment && passed && (
+        <div className="mb-5">
+          <div className="mb-1 text-[15px] font-bold text-good">Passed — journey complete!</div>
+          <p className="text-[13.5px] text-text-muted">You cleared the reassessment. This journey is marked mastered.</p>
+        </div>
+      )}
+      {isReassessment && failed && (
+        <div className="mb-5">
+          <div className="mb-1 text-[15px] font-bold text-danger">Not quite — you need 80% to pass.</div>
+          <p className="mb-2 text-[13.5px] text-text-muted">Review the recommended topics (now focused on what tripped you up) and try again.</p>
+          {result.weakTags && result.weakTags.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {result.weakTags.map((t) => (
+                <span key={t} className="chip">
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      <div className="flex justify-center gap-3">
-        {state.journeyId ? (
+      {actionError && <p className="mb-3 text-[13px] text-danger">{actionError}</p>}
+
+      <div className="flex flex-wrap justify-center gap-3">
+        {isReassessment && failed ? (
+          <>
+            <Button onClick={() => onNavigate(`/journeys/${state.journeyId}`)}>Review recommended topics</Button>
+            <Button variant="ghost" onClick={retakeReassessment} disabled={busy !== null}>
+              {busy === 'retake' ? 'Generating…' : 'Retake reassessment'}
+            </Button>
+            <Button variant="ghost" onClick={continueAnyway} disabled={busy !== null}>
+              {busy === 'complete' ? 'Saving…' : 'Continue anyway'}
+            </Button>
+          </>
+        ) : isReassessment && passed ? (
+          <>
+            <Button onClick={() => onNavigate('/dashboard')}>Start next journey</Button>
+            <Button variant="ghost" onClick={() => onNavigate(`/journeys/${state.journeyId}`)}>
+              Back to journey
+            </Button>
+          </>
+        ) : state.journeyId ? (
           <Button onClick={() => onNavigate(`/journeys/${state.journeyId}`)}>Go to journey</Button>
         ) : (
           <Button onClick={() => onNavigate('/dashboard')}>Back to dashboard</Button>
         )}
       </div>
+
+      {nudge && <p className="mt-3 text-[12.5px] text-text-dim">Next up in {state.domain}? Try a journey on “{nudge}”.</p>}
 
       <PostQuizFeedback sessionId={sessionId} />
     </Card>

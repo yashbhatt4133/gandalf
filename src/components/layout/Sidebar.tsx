@@ -35,7 +35,16 @@ export function Sidebar() {
         + Start new practice
       </Button>
 
-      <div className="mb-2.5 mt-6 font-mono text-[11.5px] font-bold uppercase tracking-wide text-text-dim">Your journeys</div>
+      <NavLink
+        to="/dashboard"
+        end
+        className={({ isActive }) => `mb-1 mt-6 block rounded-lg px-2.5 py-2.5 text-[13px] font-semibold transition-colors ${isActive ? '' : 'text-text-muted hover:bg-panel-2'}`}
+        style={({ isActive }) => (isActive ? { background: 'rgba(139,92,246,0.16)', color: 'var(--text)' } : undefined)}
+      >
+        Home
+      </NavLink>
+
+      <div className="mb-2.5 mt-4 font-mono text-[11.5px] font-bold uppercase tracking-wide text-text-dim">Your journeys</div>
       {journeys.length === 0 && <div className="px-2.5 py-2 text-[12.5px] text-text-muted">No journeys yet — start one above.</div>}
       {journeys.map((j) => (
         <JourneyNavItem key={j.id} id={j.id} topic={j.topic} domain={j.domain} />
@@ -43,16 +52,16 @@ export function Sidebar() {
 
       <div className="mb-2.5 mt-6 font-mono text-[11.5px] font-bold uppercase tracking-wide text-text-dim">Practice</div>
       <NavLink to="/timed-test" className="mb-1 block rounded-lg px-2.5 py-2.5 text-[13px] font-semibold text-text-muted hover:bg-panel-2">
-        ⏱ Time-Bound Test
+        Time-Bound Test
       </NavLink>
       <NavLink to="/adaptive-quiz" className="mb-1 block rounded-lg px-2.5 py-2.5 text-[13px] font-semibold text-text-muted hover:bg-panel-2">
-        🎯 Adaptive Quiz
+        Adaptive Quiz
       </NavLink>
       <NavLink to="/history" className="mb-1 block rounded-lg px-2.5 py-2.5 text-[13px] font-semibold text-text-muted hover:bg-panel-2">
-        🕘 History
+        History
       </NavLink>
       <NavLink to="/settings" className="mb-1 block rounded-lg px-2.5 py-2.5 text-[13px] font-semibold text-text-muted hover:bg-panel-2">
-        👤 Profile / Settings
+        Profile / Settings
       </NavLink>
 
       {modalOpen && (

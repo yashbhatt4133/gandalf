@@ -10,7 +10,7 @@ import type { ExperienceLevel, TargetRole, UserInterest } from '../../types/db';
 
 const TARGET_ROLES: TargetRole[] = ['Software Engineer', 'AI Engineer', 'ML Engineer', 'Data Scientist', 'Other'];
 const EXPERIENCE_LEVELS: ExperienceLevel[] = ['Student', 'Fresher', '1-3 YOE', '3+ YOE', 'Other'];
-const INTEREST_SUGGESTIONS = ['♟️ Chess', '🎮 Gaming', '🎬 Movies', '⚽ Football', '🏏 Cricket', '🎵 Music', '📚 Reading', '✈️ Travel', '🍳 Cooking', '🎨 Art'];
+const INTEREST_SUGGESTIONS = ['Chess', 'Gaming', 'Movies', 'Football', 'Cricket', 'Music', 'Reading', 'Travel', 'Cooking', 'Art'];
 
 export function ProfileForm({ onSaved }: { onSaved?: () => void }) {
   const { session } = useAuth();
@@ -163,7 +163,7 @@ export function ProfileForm({ onSaved }: { onSaved?: () => void }) {
               onClick={() => fileInput.current?.click()}
               className="rounded-[10px] border border-border px-3.5 py-2 text-[13px] font-semibold text-text hover:bg-panel-2"
             >
-              📄 Upload PDF/txt
+              Upload PDF/txt
             </button>
             {fileName && <span className="self-center text-[12.5px] text-text-muted">{fileName}</span>}
             <input

@@ -8,6 +8,9 @@ import { Card } from '../../components/ui/Card';
 import { signIn, signUp } from '../../lib/session';
 import { useAuth } from '../../lib/AuthContext';
 
+// Pragmatic email shape check — a non-empty local part, "@", a domain, and a TLD.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function AuthScreen() {
   const { session, loading } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -21,12 +24,23 @@ export function AuthScreen() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const cleanEmail = email.trim();
+    if (!EMAIL_RE.test(cleanEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (mode === 'signup') {
-        await signUp(email, password);
+        await signUp(cleanEmail, password);
       } else {
-        await signIn(email, password);
+        await signIn(cleanEmail, password);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
@@ -44,8 +58,8 @@ export function AuthScreen() {
 
       <Card className="w-full max-w-[380px]">
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-xl border border-border-soft bg-panel-2">
-            <GandalfMark size={34} />
+          <span className="flex h-[76px] w-[76px] items-center justify-center rounded-2xl border border-border-soft bg-panel-2">
+            <GandalfMark size={52} />
           </span>
           <div>
             <p className="mb-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-accent">Step 01 · Enter the platform</p>

@@ -13,7 +13,7 @@ function questionTypeConstraint(preferredQuestionTypes) {
   return QUESTION_TYPES_HINT;
 }
 
-function buildPrompt({ topic, domain, questionCount, level, avoidQuestions, preferredQuestionTypes, description, feedbackNotes }) {
+function buildPrompt({ topic, domain, questionCount, level, avoidQuestions, preferredQuestionTypes, description, feedbackNotes, focusTags }) {
   const avoid = avoidQuestions?.length
     ? `\n\nThe candidate has already been asked the questions below in past sessions. Write genuinely NEW questions — do not repeat, paraphrase, or closely resemble any of these:\n${avoidQuestions.map((q) => `- ${q}`).join('\n')}`
     : '';
@@ -21,10 +21,13 @@ function buildPrompt({ topic, domain, questionCount, level, avoidQuestions, pref
   const notes = feedbackNotes?.length
     ? `\n\nThe candidate left this feedback on earlier questions — take it seriously and clearly improve on it:\n${feedbackNotes.map((n) => `- ${n}`).join('\n')}`
     : '';
+  const focus = focusTags?.length
+    ? `\n\nThe candidate was weak on these specific sub-topics in an earlier quiz — concentrate the questions there to re-test exactly those gaps: ${focusTags.join(', ')}.`
+    : '';
 
   return `You are writing ${questionCount} multiple-choice interview-prep questions for the topic "${topic}" (domain: ${domain}), for a candidate at "${level}" difficulty level, for a first-round technical screening (OA/OT). Write realistic, exam-style questions of the kind actually asked in company online assessments — specific and technical, NOT generic "how should you study" advice questions.
 
-${questionTypeConstraint(preferredQuestionTypes)}${desc}${notes}
+${questionTypeConstraint(preferredQuestionTypes)}${desc}${notes}${focus}
 
 Return ONLY a JSON array (no markdown fences, no prose) of exactly ${questionCount} objects, each shaped exactly like:
 {
@@ -97,8 +100,8 @@ export function parseGeneratedQuiz(rawText, expectedCount, topic) {
   }
 }
 
-export async function generateQuizBatch({ provider, model, apiKey, topic, domain, questionCount, level, avoidQuestions, preferredQuestionTypes, description, feedbackNotes }) {
-  const prompt = buildPrompt({ topic, domain, questionCount, level, avoidQuestions, preferredQuestionTypes, description, feedbackNotes });
+export async function generateQuizBatch({ provider, model, apiKey, topic, domain, questionCount, level, avoidQuestions, preferredQuestionTypes, description, feedbackNotes, focusTags }) {
+  const prompt = buildPrompt({ topic, domain, questionCount, level, avoidQuestions, preferredQuestionTypes, description, feedbackNotes, focusTags });
 
   // There is NO static fallback bank — the app is LLM-only, so a working
   // provider (local Ollama or a cloud API) must be configured. Provider/config/

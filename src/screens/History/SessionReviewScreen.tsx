@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { DomainChip, TierChip } from '../../components/ui/Chip';
+import { GandalfMark } from '../../components/ui/GandalfMark';
 import { getSessionWithQuestions } from '../../lib/history';
 import { explainQuestion, validateQuestion, type ValidationResult } from '../../lib/api';
 import type { QuizQuestion, QuizSession } from '../../types/db';
@@ -93,7 +94,7 @@ function ReviewQuestion({ initial, index }: { initial: QuizQuestion; index: numb
         <span className="text-[12.5px] text-text-muted">Question {index + 1}</span>
         {validated && (
           <span className="rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide" style={{ color: 'var(--good)', background: 'color-mix(in srgb, var(--good) 12%, transparent)' }}>
-            ✓ Validated
+            Validated
           </span>
         )}
       </div>
@@ -113,8 +114,8 @@ function ReviewQuestion({ initial, index }: { initial: QuizQuestion; index: numb
             <div key={letter} className={cls}>
               <span className="letter">{letter}</span>
               <span className="flex-1">{text}</span>
-              {letter === q.correct_option && <span className="text-[11.5px] font-bold text-good">✓ Correct</span>}
-              {letter !== q.correct_option && letter === q.chosen_option && <span className="text-[11.5px] font-bold text-danger">✗ Your answer</span>}
+              {letter === q.correct_option && <span className="text-[11.5px] font-bold text-good">Correct</span>}
+              {letter !== q.correct_option && letter === q.chosen_option && <span className="text-[11.5px] font-bold text-danger">Your answer</span>}
             </div>
           );
         })}
@@ -138,10 +139,10 @@ function ReviewQuestion({ initial, index }: { initial: QuizQuestion; index: numb
 
       <div className="flex flex-wrap gap-2 border-t border-border-soft pt-3">
         <Button variant="ghost" onClick={handleExplain}>
-          💡 Explain more
+          Explain more
         </Button>
         <Button variant="ghost" onClick={handleValidate}>
-          ✔ Validate
+          Validate
         </Button>
       </div>
 
@@ -155,9 +156,12 @@ function ReviewModal({ modal, onClose }: { modal: ModalState; onClose: () => voi
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <Card className="max-h-[85vh] w-full max-w-lg overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[15px] font-bold">{modal.kind === 'explain' ? '💡 Explanation' : '✔ Validation'}</h2>
+          <div className="flex items-center gap-2.5">
+            <GandalfMark size={34} />
+            <h2 className="text-[15px] font-bold">{modal.kind === 'explain' ? 'Explanation' : 'Validation'}</h2>
+          </div>
           <button onClick={onClose} className="text-text-dim hover:text-text" aria-label="Close">
-            ✕
+            ×
           </button>
         </div>
 
@@ -183,7 +187,7 @@ function ReviewModal({ modal, onClose }: { modal: ModalState; onClose: () => voi
               }
             >
               <div className="mb-1 font-mono text-[11px] font-bold uppercase tracking-wide" style={{ color: modal.result.keyIsCorrect ? 'var(--good)' : 'var(--danger)' }}>
-                {modal.result.keyIsCorrect ? '✓ Answer key verified' : `⚠ Answer key was wrong`}
+                {modal.result.keyIsCorrect ? 'Answer key verified' : 'Answer key was wrong'}
               </div>
               <p>{modal.result.verdict}</p>
             </div>

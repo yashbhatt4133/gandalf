@@ -61,6 +61,36 @@ async function gatherGenerationContext(admin, userId, topic) {
   return { avoidQuestions, feedbackNotes };
 }
 
+const PASS_THRESHOLD = 80;
+
+/** Distinct lowercased tags drawn from the incorrectly-answered questions in a
+ *  session — i.e. the sub-topics the candidate is weak on. Empty = no gaps. */
+async function weakTagsForSession(admin, sessionId) {
+  const { data: qs } = await admin.from('quiz_questions').select('tags, is_correct').eq('quiz_session_id', sessionId);
+  const weak = new Set();
+  for (const q of qs ?? []) {
+    if (q.is_correct === false) for (const t of q.tags ?? []) weak.add(String(t).toLowerCase());
+  }
+  return Array.from(weak);
+}
+
+/** The journey's current weak sub-topics: the most recent completed reassessment
+ *  if one exists (so a failed retry narrows to what's *still* failing), else the
+ *  calibration. Used to scope recommended-topic and reassessment generation. */
+async function gapTagsForJourney(admin, userId, journeyId) {
+  const { data: sessions } = await admin
+    .from('quiz_sessions')
+    .select('id, session_type, taken_at')
+    .eq('user_id', userId)
+    .eq('journey_id', journeyId)
+    .eq('completed', true)
+    .in('session_type', ['calibration', 'reassessment'])
+    .order('taken_at', { ascending: false });
+  const latest = (sessions ?? []).find((s) => s.session_type === 'reassessment') ?? (sessions ?? [])[0];
+  if (!latest) return [];
+  return weakTagsForSession(admin, latest.id);
+}
+
 async function advanceStep(journeyId, stepName) {
   const admin = getSupabaseAdmin();
   const { data: steps } = await admin.from('journey_steps').select('*').eq('journey_id', journeyId).order('order_index');
@@ -175,6 +205,11 @@ export async function createQuizSession(userId, { sessionType, topic, domain, qu
   // session, so the new (still-empty) session doesn't pollute the avoid list.
   const { avoidQuestions, feedbackNotes } = await gatherGenerationContext(admin, userId, topic);
 
+  // Reassessment re-tests only the sub-topics the candidate was weak on
+  // (derived from the journey's latest calibration/reassessment). Calibration
+  // stays broad.
+  const focusTags = sessionType === 'reassessment' && journeyId ? await gapTagsForJourney(admin, userId, journeyId) : [];
+
   const { data: session, error: sessionErr } = await admin
     .from('quiz_sessions')
     .insert({
@@ -218,6 +253,7 @@ export async function createQuizSession(userId, { sessionType, topic, domain, qu
     preferredQuestionTypes: cleanQuestionTypes,
     description: cleanDescription,
     feedbackNotes,
+    focusTags,
   });
   const rows = questions.map((q) => ({ ...q, quiz_session_id: session.id, user_id: userId }));
   const { data: inserted, error: qErr } = await admin.from('quiz_questions').insert(rows).select();
@@ -427,20 +463,28 @@ export async function finishSession(userId, { sessionId }) {
     await advanceStep(session.journey_id, 'quiz');
   }
 
+  let weakTags = [];
   if (session.journey_id && session.session_type === 'reassessment') {
-    if (scorePct > 80) {
-      outcome = 'mastered';
+    weakTags = await weakTagsForSession(admin, sessionId);
+    if (scorePct >= PASS_THRESHOLD) {
+      // Pass → journey complete, reassessment step done (all steps done → 100%).
+      outcome = 'passed';
       await admin.from('journeys').update({ status: 'mastered' }).eq('id', session.journey_id);
-    } else if (scorePct <= 40) {
-      outcome = 'reset';
-      await admin.from('recommended_topics').update({ status: 'todo' }).eq('journey_id', session.journey_id).eq('status', 'done');
+      await advanceStep(session.journey_id, 'reassessment');
     } else {
-      outcome = 'read_more';
+      // Fail → keep the journey active and route the user back to a gap-scoped
+      // re-review: reopen recommended_topics, hold reassessment as upcoming.
+      outcome = 'failed';
+      await admin.from('journeys').update({ status: 'active' }).eq('id', session.journey_id);
+      const { data: steps } = await admin.from('journey_steps').select('id, step_name').eq('journey_id', session.journey_id);
+      for (const s of steps ?? []) {
+        if (s.step_name === 'recommended_topics') await admin.from('journey_steps').update({ status: 'current' }).eq('id', s.id);
+        if (s.step_name === 'reassessment') await admin.from('journey_steps').update({ status: 'upcoming' }).eq('id', s.id);
+      }
     }
-    await advanceStep(session.journey_id, 'reassessment');
   }
 
-  return { score: scorePct, total, timeTakenSeconds, level: session.level_at_time, outcome };
+  return { score: scorePct, total, timeTakenSeconds, level: session.level_at_time, outcome, weakTags };
 }
 
 // ---------- Learning verticals ----------
@@ -449,15 +493,32 @@ export async function generateVerticalsForJourney(userId, { journeyId, topic, do
   const admin = getSupabaseAdmin();
   const { data: interestRows } = await admin.from('user_interests').select('label').eq('user_id', userId);
   const interests = (interestRows ?? []).map((r) => r.label);
+  const gaps = await gapTagsForJourney(admin, userId, journeyId);
 
   const { provider, model, apiKey } = await resolveProviderForUser(userId);
-  const verticals = await generateVerticals({ provider, model, apiKey, topic, domain, interests });
+  // Generate first — if this throws (provider error), the prior set is untouched.
+  const verticals = await generateVerticals({ provider, model, apiKey, topic, domain, interests, gaps });
 
+  // Replace any prior set so a failed-reassessment re-review regenerates a
+  // newly gap-scoped list rather than appending duplicates.
+  await admin.from('recommended_topics').delete().eq('journey_id', journeyId);
   const rows = verticals.map((v) => ({ ...v, journey_id: journeyId, user_id: userId, status: 'todo' }));
   const { error } = await admin.from('recommended_topics').insert(rows);
   if (error) throw error;
 
   await advanceStep(journeyId, 'recommended_topics');
 
-  return { generated: rows.length };
+  return { generated: rows.length, gaps };
+}
+
+/** "Continue anyway" — mark a journey complete even without a passing
+ *  reassessment, so the user is never trapped in the mastery loop. */
+export async function forceCompleteJourney(userId, { journeyId }) {
+  if (!journeyId) throw new BadRequestError('journeyId is required.');
+  const admin = getSupabaseAdmin();
+  const { data: journey } = await admin.from('journeys').select('id').eq('id', journeyId).eq('user_id', userId).maybeSingle();
+  if (!journey) throw new NotFoundError('Journey not found.');
+  await admin.from('journeys').update({ status: 'mastered' }).eq('id', journeyId);
+  await admin.from('journey_steps').update({ status: 'done' }).eq('journey_id', journeyId);
+  return { ok: true };
 }
