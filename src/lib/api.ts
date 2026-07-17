@@ -1,5 +1,5 @@
 import { getAccessToken } from './session';
-import type { ClientQuizQuestion, ProviderId, SessionType } from '../types/db';
+import type { ClientQuizQuestion, Difficulty, ProviderId, QuestionType, SessionType } from '../types/db';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -49,6 +49,9 @@ export interface GenerateQuizParams {
   questionCount: number;
   journeyId?: string | null;
   timeLimitSeconds?: number | null;
+  preQuestionTypes?: QuestionType[];
+  preDifficulty?: Difficulty;
+  description?: string;
 }
 
 export function generateQuiz(params: GenerateQuizParams) {
@@ -72,7 +75,7 @@ export function answerQuestion(params: { questionId: string; chosenOption: strin
   });
 }
 
-export function completeSession(sessionId: string, topic: string, domain: string) {
+export function completeSession(sessionId: string) {
   return apiFetch<{
     score: number;
     total: number;
@@ -81,7 +84,41 @@ export function completeSession(sessionId: string, topic: string, domain: string
     outcome?: 'mastered' | 'read_more' | 'reset' | null;
   }>('/api/complete-session', {
     method: 'POST',
-    body: JSON.stringify({ sessionId, topic, domain }),
+    body: JSON.stringify({ sessionId }),
+  });
+}
+
+export function submitQuizFeedback(sessionId: string, params: { satisfaction?: number | null; comment?: string | null }) {
+  return apiFetch<{ ok: true }>('/api/quiz-feedback', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId, ...params }),
+  });
+}
+
+// ---------- Per-question review (History) ----------
+
+export function explainQuestion(questionId: string) {
+  return apiFetch<{ explanation: string }>('/api/explain-question', {
+    method: 'POST',
+    body: JSON.stringify({ questionId }),
+  });
+}
+
+export interface ValidationResult {
+  independentAnswer: string;
+  keyIsCorrect: boolean;
+  verdict: string;
+  storedCorrectOption: string;
+  updatedCorrectOption: string;
+  updatedExplanation: string;
+  isCorrect: boolean | null;
+  changed: boolean;
+}
+
+export function validateQuestion(questionId: string) {
+  return apiFetch<ValidationResult>('/api/validate-question', {
+    method: 'POST',
+    body: JSON.stringify({ questionId }),
   });
 }
 

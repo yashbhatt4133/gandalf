@@ -4,6 +4,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { TierChip } from '../../components/ui/Chip';
 import { answerQuestion, completeSession, generateAdaptiveQuestion } from '../../lib/api';
+import { PostQuizFeedback } from '../../components/PostQuizFeedback';
 import type { ClientQuizQuestion, SessionType } from '../../types/db';
 
 export interface QuizRunnerState {
@@ -18,6 +19,7 @@ export interface QuizRunnerState {
 interface AnswerResult {
   isCorrect: boolean;
   correctOption: string;
+  chosenOption: string;
   explanation: string;
 }
 
@@ -69,7 +71,7 @@ export function QuizRunner() {
     const timeSpentSeconds = Math.round((Date.now() - questionStartedAt) / 1000);
     try {
       const res = await answerQuestion({ questionId: current.id, chosenOption: letter, timeSpentSeconds });
-      setAnswers((prev) => ({ ...prev, [current.id]: res }));
+      setAnswers((prev) => ({ ...prev, [current.id]: { ...res, chosenOption: letter } }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not submit your answer.');
     }
@@ -103,7 +105,7 @@ export function QuizRunner() {
     setFinishing(true);
     setError(null);
     try {
-      const res = await completeSession(sessionId!, state!.topic, state!.domain);
+      const res = await completeSession(sessionId!);
       setResult(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not finish the session.');
@@ -113,7 +115,7 @@ export function QuizRunner() {
   }
 
   if (result) {
-    return <ResultsView result={result} state={state} onNavigate={navigate} />;
+    return <ResultsView result={result} state={state} sessionId={sessionId!} onNavigate={navigate} />;
   }
 
   if (!current) {
@@ -143,7 +145,7 @@ export function QuizRunner() {
 
       <Card className="predict-card relative">
         {current.question_type === 'predict_output' && current.language && (
-          <span className="absolute right-5 top-5 rounded-full border border-border-soft bg-panel-2 px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-wide text-text-dim">
+          <span className="absolute right-5 top-5 rounded-full border border-border-soft bg-panel-2 px-2.5 py-1 font-mono text-[10.5px] font-bold uppercase tracking-wide text-text-dim">
             {current.language}
           </span>
         )}
@@ -159,14 +161,14 @@ export function QuizRunner() {
             let cls = 'option-row';
             if (answered) {
               if (letter === answered.correctOption) cls += ' correct';
-              else if (letter === current.chosen_option) cls += ' incorrect';
+              else if (letter === answered.chosenOption) cls += ' incorrect';
             }
             return (
               <button key={letter} className={cls} disabled={!!answered} onClick={() => handleAnswer(letter)}>
                 <span className="letter">{letter}</span>
                 <span className="flex-1">{text}</span>
                 {answered && letter === answered.correctOption && <span className="text-[11.5px] font-bold text-good">✓ Correct</span>}
-                {answered && letter !== answered.correctOption && letter === current.chosen_option && (
+                {answered && letter !== answered.correctOption && letter === answered.chosenOption && (
                   <span className="text-[11.5px] font-bold text-danger">✗ Your answer</span>
                 )}
               </button>
@@ -200,10 +202,12 @@ export function QuizRunner() {
 function ResultsView({
   result,
   state,
+  sessionId,
   onNavigate,
 }: {
   result: { score: number; total: number; timeTakenSeconds: number; outcome?: string | null };
   state: QuizRunnerState;
+  sessionId: string;
   onNavigate: ReturnType<typeof useNavigate>;
 }) {
   const outcomeCopy: Record<string, string> = {
@@ -214,7 +218,7 @@ function ResultsView({
 
   return (
     <Card className="max-w-lg text-center">
-      <div className="mb-2 text-[13px] font-bold uppercase tracking-wide text-text-dim">
+      <div className="mb-2 font-mono text-[13px] font-bold uppercase tracking-wide text-text-dim">
         {state.sessionType === 'calibration' && 'Calibration complete'}
         {state.sessionType === 'reassessment' && 'Reassessment complete'}
         {state.sessionType === 'adaptive' && 'Session finished'}
@@ -234,6 +238,8 @@ function ResultsView({
           <Button onClick={() => onNavigate('/dashboard')}>Back to dashboard</Button>
         )}
       </div>
+
+      <PostQuizFeedback sessionId={sessionId} />
     </Card>
   );
 }

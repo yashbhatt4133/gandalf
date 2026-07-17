@@ -44,14 +44,14 @@ export function LearningScreen() {
       {topics.length > 0 && (
         <div className="flex items-start gap-6">
           <div className="w-64 flex-shrink-0">
-            <div className="mb-2 text-[11.5px] font-bold uppercase tracking-wide text-text-dim">Recommended for: {journey?.topic}</div>
+            <div className="mb-2 font-mono text-[11.5px] font-bold uppercase tracking-wide text-text-dim">Recommended for: {journey?.topic}</div>
             <div className="flex flex-col gap-1">
               {topics.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setSelectedId(t.id)}
                   className="flex items-start gap-2.5 rounded-xl px-2.5 py-2.5 text-left transition-colors"
-                  style={{ background: selectedId === t.id ? 'rgba(124,156,255,0.14)' : undefined }}
+                  style={{ background: selectedId === t.id ? 'rgba(139,92,246,0.16)' : undefined }}
                 >
                   <span
                     className="mt-0.5 flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full text-[11.5px] font-bold"
@@ -119,7 +119,7 @@ export function LearningScreen() {
 function VBlock({ label, children }: { label: string; children: ReactNode }) {
   return (
     <Card>
-      <h3 className="mb-2.5 flex items-center gap-2 text-[12.5px] font-bold uppercase tracking-wide text-accent-soft">{label}</h3>
+      <h3 className="mb-2.5 flex items-center gap-2 font-mono text-[12.5px] font-bold uppercase tracking-wide text-accent-soft">{label}</h3>
       <div className="text-[14.5px] leading-relaxed">{children}</div>
     </Card>
   );

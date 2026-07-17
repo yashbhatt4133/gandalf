@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { TopicPicker } from '../../components/TopicPicker';
+import { PreQuizFeedback, defaultPreQuizPrefs, preQuizPrefsToParams } from '../../components/PreQuizFeedback';
 import { generateQuiz } from '../../lib/api';
 import type { QuizRunnerState } from '../Quiz/QuizRunner';
 
@@ -16,6 +17,7 @@ export function TimedTestPicker() {
   const [topic, setTopic] = useState(params.get('topic') || '');
   const [questionCount, setQuestionCount] = useState(10);
   const [timeLimitMin, setTimeLimitMin] = useState(10);
+  const [prefs, setPrefs] = useState(defaultPreQuizPrefs());
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +32,7 @@ export function TimedTestPicker() {
         domain,
         questionCount,
         timeLimitSeconds: timeLimitMin * 60,
+        ...preQuizPrefsToParams(prefs),
       });
       const state: QuizRunnerState = { questions, timeLimitSeconds, sessionType: 'timed_test', topic: topic.trim(), domain };
       navigate(`/timed-test/${sessionId}`, { state });
@@ -97,6 +100,8 @@ export function TimedTestPicker() {
             ))}
           </div>
         </div>
+
+        <PreQuizFeedback prefs={prefs} onChange={setPrefs} />
 
         {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
 

@@ -14,6 +14,7 @@ export function ProfileSetupScreen() {
       </div>
 
       <div className="mb-8 text-center">
+        <p className="mb-2 font-mono text-[11px] font-bold uppercase tracking-wider text-accent">Step 02 · Set up your profile</p>
         <h1 className="text-2xl font-extrabold tracking-tight">Tell Gandalf a bit about yourself</h1>
         <p className="mt-2 max-w-md text-[14.5px] text-text-muted">
           This shapes which topics get recommended and how examples are framed — you can change any of it later from Settings.

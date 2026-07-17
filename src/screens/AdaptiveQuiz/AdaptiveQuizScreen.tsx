@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { TopicPicker } from '../../components/TopicPicker';
+import { PreQuizFeedback, defaultPreQuizPrefs, preQuizPrefsToParams } from '../../components/PreQuizFeedback';
 import { generateQuiz } from '../../lib/api';
 import type { QuizRunnerState } from '../Quiz/QuizRunner';
 
@@ -10,6 +11,7 @@ export function AdaptiveQuizScreen() {
   const navigate = useNavigate();
   const [domain, setDomain] = useState<string | null>(null);
   const [topic, setTopic] = useState('');
+  const [prefs, setPrefs] = useState(defaultPreQuizPrefs());
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,6 +25,7 @@ export function AdaptiveQuizScreen() {
         topic: topic.trim(),
         domain,
         questionCount: 1,
+        ...preQuizPrefsToParams(prefs),
       });
       const state: QuizRunnerState = { questions, timeLimitSeconds, sessionType: 'adaptive', topic: topic.trim(), domain };
       navigate(`/adaptive-quiz/${sessionId}`, { state });
@@ -48,6 +51,8 @@ export function AdaptiveQuizScreen() {
             }}
           />
         </div>
+
+        <PreQuizFeedback prefs={prefs} onChange={setPrefs} />
 
         {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
 

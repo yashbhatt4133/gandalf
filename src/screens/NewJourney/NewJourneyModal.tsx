@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { TopicPicker } from '../../components/TopicPicker';
+import { PreQuizFeedback, defaultPreQuizPrefs, preQuizPrefsToParams } from '../../components/PreQuizFeedback';
 import { useAuth } from '../../lib/AuthContext';
 import { createJourney } from '../../lib/journeys';
 import { generateQuiz } from '../../lib/api';
@@ -13,6 +14,7 @@ export function NewJourneyModal({ onClose, onCreated }: { onClose: () => void; o
   const navigate = useNavigate();
   const [domain, setDomain] = useState<string | null>(null);
   const [topic, setTopic] = useState('');
+  const [prefs, setPrefs] = useState(defaultPreQuizPrefs());
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +30,7 @@ export function NewJourneyModal({ onClose, onCreated }: { onClose: () => void; o
         domain,
         questionCount: 5,
         journeyId: journey.id,
+        ...preQuizPrefsToParams(prefs),
       });
 
       const state: QuizRunnerState = { questions, timeLimitSeconds, sessionType: 'calibration', topic: topic.trim(), domain, journeyId: journey.id };
@@ -61,6 +64,10 @@ export function NewJourneyModal({ onClose, onCreated }: { onClose: () => void; o
                 setTopic(t);
               }}
             />
+
+            <div className="mt-5">
+              <PreQuizFeedback prefs={prefs} onChange={setPrefs} />
+            </div>
 
             {error && <p className="mb-3 mt-4 text-[13px] text-danger">{error}</p>}
 

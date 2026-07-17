@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { CosmicBackground } from '../../components/ui/CosmicBackground';
 import { ThemeToggle } from '../../components/ui/ThemeToggle';
+import { GandalfMark } from '../../components/ui/GandalfMark';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { signIn, signUp } from '../../lib/session';
@@ -43,13 +44,11 @@ export function AuthScreen() {
 
       <Card className="w-full max-w-[380px]">
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
-          <span
-            className="flex h-11 w-11 items-center justify-center rounded-xl text-xl font-bold text-white"
-            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent-glow))', boxShadow: '0 2px 8px rgba(47,111,237,0.4)' }}
-          >
-            G
+          <span className="flex h-14 w-14 items-center justify-center rounded-xl border border-border-soft bg-panel-2">
+            <GandalfMark size={34} />
           </span>
           <div>
+            <p className="mb-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-accent">Step 01 · Enter the platform</p>
             <h1 className="text-xl font-extrabold tracking-tight">Gandalf</h1>
             <p className="mt-1 text-[13px] text-text-muted">Practice for the round that gates the rest.</p>
           </div>

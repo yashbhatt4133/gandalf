@@ -29,7 +29,7 @@ export function MetricsPanel({ userId, domain, topic }: { userId: string; domain
 
   return (
     <div>
-      <div className="mb-3.5 text-[12.5px] font-bold uppercase tracking-wide text-text-dim">Metrics</div>
+      <div className="mb-3.5 font-mono text-[12.5px] font-bold uppercase tracking-wide text-text-dim">Metrics</div>
 
       <div className="mb-4 grid grid-cols-2 gap-3.5 sm:grid-cols-3">
         <StatTile label="Attempts" value={String(own?.attempts_count ?? 0)} />

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { DomainChip, StatusPill } from '../../components/ui/Chip';
+import { PreQuizFeedback, defaultPreQuizPrefs, preQuizPrefsToParams } from '../../components/PreQuizFeedback';
 import { getJourney, listJourneySteps } from '../../lib/journeys';
 import { generateQuiz, generateLearningVerticals } from '../../lib/api';
 import { useJourneys } from '../../lib/JourneysContext';
@@ -24,6 +25,7 @@ export function JourneyDetail() {
   const [steps, setSteps] = useState<JourneyStep[]>([]);
   const [busyStep, setBusyStep] = useState<StepName | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [prefs, setPrefs] = useState(defaultPreQuizPrefs());
 
   const load = useCallback(() => {
     if (!journeyId) return;
@@ -49,6 +51,7 @@ export function JourneyDetail() {
         domain: journey!.domain,
         questionCount: 5,
         journeyId: journey!.id,
+        ...preQuizPrefsToParams(prefs),
       });
       const state: QuizRunnerState = { questions, timeLimitSeconds, sessionType, topic: journey!.topic, domain: journey!.domain, journeyId: journey!.id };
       navigate(`/journeys/${journey!.id}/quiz/${sessionId}`, { state });
@@ -82,8 +85,14 @@ export function JourneyDetail() {
 
       {error && <p className="mb-4 text-[13px] text-danger">{error}</p>}
 
+      {steps.some((s) => (s.step_name === 'quiz' || s.step_name === 'reassessment') && s.status === 'current') && (
+        <Card className="mb-6">
+          <PreQuizFeedback prefs={prefs} onChange={setPrefs} />
+        </Card>
+      )}
+
       <Card className="mb-6">
-        <div className="mb-4 text-[12.5px] font-bold uppercase tracking-wide text-text-dim">Steps</div>
+        <div className="mb-4 font-mono text-[12.5px] font-bold uppercase tracking-wide text-text-dim">Steps</div>
         <div className="flex flex-col gap-3">
           {steps.map((step) => (
             <div key={step.id} className="flex items-center justify-between rounded-xl border border-border-soft px-4 py-3">

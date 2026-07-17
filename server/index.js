@@ -20,6 +20,9 @@ import {
   generateNextAdaptiveQuestion,
   submitAnswer,
   finishSession,
+  submitQuizFeedback,
+  explainQuestion,
+  validateQuestion,
   generateVerticalsForJourney,
 } from './core/sessions.js';
 
@@ -90,6 +93,30 @@ app.post(
   asyncHandler(async (req, res) => {
     const user = await verifyUser(req.headers.authorization);
     res.json(await finishSession(user.id, req.body));
+  })
+);
+
+app.post(
+  '/api/quiz-feedback',
+  asyncHandler(async (req, res) => {
+    const user = await verifyUser(req.headers.authorization);
+    res.json(await submitQuizFeedback(user.id, req.body));
+  })
+);
+
+app.post(
+  '/api/explain-question',
+  asyncHandler(async (req, res) => {
+    const user = await verifyUser(req.headers.authorization);
+    res.json(await explainQuestion(user.id, req.body));
+  })
+);
+
+app.post(
+  '/api/validate-question',
+  asyncHandler(async (req, res) => {
+    const user = await verifyUser(req.headers.authorization);
+    res.json(await validateQuestion(user.id, req.body));
   })
 );
 

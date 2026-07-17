@@ -6,7 +6,7 @@
 import { getSupabaseAdmin } from './supabaseAdmin.js';
 import { resolveProviderForUser, isDeployedMode, localFallback, formatBadgeLabel, DEFAULT_MODELS } from './providers/index.js';
 import { encryptApiKey } from './crypto.js';
-import { generateQuizBatch, generateOneAdaptiveQuestion } from './quiz.js';
+import { generateQuizBatch, generateOneAdaptiveQuestion, generateExplanation, validateGeneratedQuestion } from './quiz.js';
 import { generateVerticals } from './verticals.js';
 import { parseResumeText } from './cvParse.js';
 import { NotFoundError, BadRequestError } from './errors.js';
@@ -23,6 +23,42 @@ async function pickLevel(userId, domain, topic) {
   if (score >= 70) return 'advanced';
   if (score >= 40) return 'core';
   return 'foundational';
+}
+
+/**
+ * Cross-session context for fresh, feedback-aware generation:
+ * - `avoidQuestions`: question texts already asked to this user on this topic
+ *   (across every past session), so regeneration doesn't repeat itself.
+ * - `feedbackNotes`: the user's recent post-quiz comments, so their guidance
+ *   ("write real interview questions") actually shapes the next prompt.
+ */
+async function gatherGenerationContext(admin, userId, topic) {
+  let avoidQuestions = [];
+  if (topic) {
+    const { data: sessions } = await admin
+      .from('quiz_sessions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('topic', topic)
+      .order('taken_at', { ascending: false })
+      .limit(12);
+    const sessionIds = (sessions ?? []).map((s) => s.id);
+    if (sessionIds.length) {
+      const { data: qs } = await admin.from('quiz_questions').select('question_text').in('quiz_session_id', sessionIds).limit(80);
+      avoidQuestions = Array.from(new Set((qs ?? []).map((q) => q.question_text))).slice(0, 80);
+    }
+  }
+
+  const { data: fb } = await admin
+    .from('quiz_feedback')
+    .select('post_comment, updated_at')
+    .eq('user_id', userId)
+    .not('post_comment', 'is', null)
+    .order('updated_at', { ascending: false })
+    .limit(5);
+  const feedbackNotes = (fb ?? []).map((f) => f.post_comment).filter((c) => c && c.trim());
+
+  return { avoidQuestions, feedbackNotes };
 }
 
 async function advanceStep(journeyId, stepName) {
@@ -116,7 +152,10 @@ export async function parseCvForUser(userId, text) {
 
 // ---------- Quiz generation / answering ----------
 
-export async function createQuizSession(userId, { sessionType, topic, domain, questionCount, journeyId, timeLimitSeconds }) {
+const QUESTION_TYPES = ['mcq', 'predict_output'];
+const DIFFICULTIES = ['foundational', 'core', 'advanced'];
+
+export async function createQuizSession(userId, { sessionType, topic, domain, questionCount, journeyId, timeLimitSeconds, preQuestionTypes, preDifficulty, description }) {
   if (!['calibration', 'reassessment', 'adaptive', 'timed_test'].includes(sessionType)) {
     throw new BadRequestError('Invalid sessionType.');
   }
@@ -124,15 +163,26 @@ export async function createQuizSession(userId, { sessionType, topic, domain, qu
 
   const count = Math.max(1, Math.min(50, Number(questionCount) || 5));
   const { provider, model, apiKey } = await resolveProviderForUser(userId);
-  const level = await pickLevel(userId, domain, topic);
+
+  const cleanQuestionTypes = Array.isArray(preQuestionTypes) ? preQuestionTypes.filter((t) => QUESTION_TYPES.includes(t)) : [];
+  const cleanDifficulty = DIFFICULTIES.includes(preDifficulty) ? preDifficulty : null;
+  const cleanDescription = typeof description === 'string' && description.trim() ? description.trim().slice(0, 2000) : null;
+  const level = cleanDifficulty || (await pickLevel(userId, domain, topic));
 
   const admin = getSupabaseAdmin();
+
+  // Gather what's already been asked + recent feedback BEFORE inserting the new
+  // session, so the new (still-empty) session doesn't pollute the avoid list.
+  const { avoidQuestions, feedbackNotes } = await gatherGenerationContext(admin, userId, topic);
+
   const { data: session, error: sessionErr } = await admin
     .from('quiz_sessions')
     .insert({
       journey_id: journeyId || null,
       user_id: userId,
       session_type: sessionType,
+      topic,
+      domain,
       level_at_time: level,
       time_limit_seconds: timeLimitSeconds || null,
       provider_used: provider.id,
@@ -142,7 +192,33 @@ export async function createQuizSession(userId, { sessionType, topic, domain, qu
     .single();
   if (sessionErr) throw sessionErr;
 
-  const questions = await generateQuizBatch({ provider, model, apiKey, topic, domain, questionCount: count, level, avoidQuestions: [] });
+  if (cleanQuestionTypes.length > 0 || cleanDifficulty || cleanDescription) {
+    // Best-effort: if pre_description column isn't present yet, the insert is
+    // ignored (error not thrown) and generation still proceeds using the value.
+    await admin.from('quiz_feedback').insert({
+      quiz_session_id: session.id,
+      user_id: userId,
+      pre_question_types: cleanQuestionTypes.length > 0 ? cleanQuestionTypes : null,
+      pre_difficulty: cleanDifficulty,
+      pre_description: cleanDescription,
+    });
+  }
+
+  // Provider errors propagate out of this call (see generateQuizBatch) so the
+  // client surfaces "generation failed" instead of silently getting filler.
+  const questions = await generateQuizBatch({
+    provider,
+    model,
+    apiKey,
+    topic,
+    domain,
+    questionCount: count,
+    level,
+    avoidQuestions,
+    preferredQuestionTypes: cleanQuestionTypes,
+    description: cleanDescription,
+    feedbackNotes,
+  });
   const rows = questions.map((q) => ({ ...q, quiz_session_id: session.id, user_id: userId }));
   const { data: inserted, error: qErr } = await admin.from('quiz_questions').insert(rows).select();
   if (qErr) throw qErr;
@@ -156,13 +232,33 @@ export async function generateNextAdaptiveQuestion(userId, { sessionId, topic, d
   const { data: session } = await admin.from('quiz_sessions').select('*').eq('id', sessionId).eq('user_id', userId).maybeSingle();
   if (!session) throw new NotFoundError('Session not found.');
 
+  const resolvedTopic = session.topic || topic;
+  const resolvedDomain = session.domain || domain;
+
   const { data: existing } = await admin.from('quiz_questions').select('question_text, order_index').eq('quiz_session_id', sessionId).order('order_index');
-  const avoidQuestions = (existing ?? []).map((q) => q.question_text);
   const nextIndex = existing?.length ?? 0;
 
+  const { data: feedback } = await admin.from('quiz_feedback').select('pre_question_types, pre_difficulty, pre_description').eq('quiz_session_id', sessionId).maybeSingle();
+  const preferredQuestionTypes = feedback?.pre_question_types ?? [];
+
+  // Avoid both this session's own questions and any asked on this topic before.
+  const { avoidQuestions: crossSession, feedbackNotes } = await gatherGenerationContext(admin, userId, resolvedTopic);
+  const avoidQuestions = Array.from(new Set([...(existing ?? []).map((q) => q.question_text), ...crossSession]));
+
   const { provider, model, apiKey } = await resolveProviderForUser(userId);
-  const level = await pickLevel(userId, domain, topic);
-  const question = await generateOneAdaptiveQuestion({ provider, model, apiKey, topic, domain, level, avoidQuestions });
+  const level = feedback?.pre_difficulty || (await pickLevel(userId, resolvedDomain, resolvedTopic));
+  const question = await generateOneAdaptiveQuestion({
+    provider,
+    model,
+    apiKey,
+    topic: resolvedTopic,
+    domain: resolvedDomain,
+    level,
+    avoidQuestions,
+    preferredQuestionTypes,
+    description: feedback?.pre_description ?? null,
+    feedbackNotes,
+  });
 
   const { data: inserted, error } = await admin
     .from('quiz_questions')
@@ -172,6 +268,85 @@ export async function generateNextAdaptiveQuestion(userId, { sessionId, topic, d
   if (error) throw error;
 
   return { question: stripAnswerKey(inserted) };
+}
+
+export async function submitQuizFeedback(userId, { sessionId, satisfaction, comment }) {
+  if (!sessionId) throw new BadRequestError('sessionId is required.');
+  const admin = getSupabaseAdmin();
+  const { data: session } = await admin.from('quiz_sessions').select('id').eq('id', sessionId).eq('user_id', userId).maybeSingle();
+  if (!session) throw new NotFoundError('Session not found.');
+
+  const cleanSatisfaction = Number.isInteger(satisfaction) && satisfaction >= 1 && satisfaction <= 5 ? satisfaction : null;
+
+  const { error } = await admin.from('quiz_feedback').upsert(
+    {
+      quiz_session_id: sessionId,
+      user_id: userId,
+      post_satisfaction: cleanSatisfaction,
+      post_comment: typeof comment === 'string' ? comment.trim().slice(0, 1000) : null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'quiz_session_id' }
+  );
+  if (error) throw error;
+
+  return { ok: true };
+}
+
+// ---------- Per-question review (History screen) ----------
+
+/** "Explain More" — a fresh, personalized explanation for one past question. */
+export async function explainQuestion(userId, { questionId }) {
+  if (!questionId) throw new BadRequestError('questionId is required.');
+  const admin = getSupabaseAdmin();
+  const { data: question } = await admin.from('quiz_questions').select('*').eq('id', questionId).eq('user_id', userId).maybeSingle();
+  if (!question) throw new NotFoundError('Question not found.');
+
+  const { data: profile } = await admin.from('profiles').select('target_role').eq('user_id', userId).maybeSingle();
+  const { data: interestRows } = await admin.from('user_interests').select('label').eq('user_id', userId);
+  const interests = (interestRows ?? []).map((r) => r.label);
+
+  const { provider, model, apiKey } = await resolveProviderForUser(userId);
+  const explanation = await generateExplanation({ provider, model, apiKey, question, targetRole: profile?.target_role, interests });
+  return { explanation };
+}
+
+/**
+ * "Validate" — independently re-solve the question, check the stored answer key,
+ * and persist the verified result: the question's `correct_option`/`explanation`
+ * are updated to the validated answer and `is_correct` is recomputed for the
+ * user's original pick, so the History record reflects the corrected answer.
+ */
+export async function validateQuestion(userId, { questionId }) {
+  if (!questionId) throw new BadRequestError('questionId is required.');
+  const admin = getSupabaseAdmin();
+  const { data: question } = await admin.from('quiz_questions').select('*').eq('id', questionId).eq('user_id', userId).maybeSingle();
+  if (!question) throw new NotFoundError('Question not found.');
+
+  const { provider, model, apiKey } = await resolveProviderForUser(userId);
+  const result = await validateGeneratedQuestion({ provider, model, apiKey, question });
+
+  const storedCorrectOption = String(question.correct_option ?? '').trim().toUpperCase();
+  const updatedCorrectOption = result.independentAnswer;
+  const updatedExplanation = result.explanation || question.explanation || '';
+  const isCorrect = question.chosen_option ? String(question.chosen_option).trim().toUpperCase() === updatedCorrectOption : question.is_correct;
+
+  const { error } = await admin
+    .from('quiz_questions')
+    .update({ correct_option: updatedCorrectOption, explanation: updatedExplanation, is_correct: isCorrect })
+    .eq('id', questionId);
+  if (error) throw error;
+
+  return {
+    independentAnswer: result.independentAnswer,
+    keyIsCorrect: result.keyIsCorrect,
+    verdict: result.verdict,
+    storedCorrectOption,
+    updatedCorrectOption,
+    updatedExplanation,
+    isCorrect,
+    changed: storedCorrectOption !== updatedCorrectOption,
+  };
 }
 
 export async function submitAnswer(userId, { questionId, chosenOption, timeSpentSeconds }) {
@@ -190,13 +365,13 @@ export async function submitAnswer(userId, { questionId, chosenOption, timeSpent
   return { isCorrect, correctOption: question.correct_option, explanation: question.explanation || '' };
 }
 
-export async function finishSession(userId, { sessionId, topic, domain }) {
+export async function finishSession(userId, { sessionId }) {
   const admin = getSupabaseAdmin();
   const { data: session } = await admin.from('quiz_sessions').select('*').eq('id', sessionId).eq('user_id', userId).maybeSingle();
   if (!session) throw new NotFoundError('Session not found.');
 
-  let resolvedTopic = topic;
-  let resolvedDomain = domain;
+  let resolvedTopic = session.topic;
+  let resolvedDomain = session.domain;
   if (session.journey_id) {
     const { data: journey } = await admin.from('journeys').select('topic, domain').eq('id', session.journey_id).maybeSingle();
     if (journey) {

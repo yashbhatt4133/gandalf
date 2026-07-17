@@ -9,7 +9,14 @@ export const ollamaProvider = {
       res = await fetch(`${BASE_URL}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, prompt, stream: false }),
+        // A per-call random seed + non-zero temperature so regenerating on the
+        // same topic/level yields fresh questions rather than the same output.
+        body: JSON.stringify({
+          model,
+          prompt,
+          stream: false,
+          options: { temperature: 0.8, top_p: 0.95, seed: Math.floor(Math.random() * 1e9) },
+        }),
       });
     } catch {
       throw new Error(`Could not reach Ollama at ${BASE_URL} — is \`ollama serve\` running?`);

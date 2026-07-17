@@ -67,7 +67,7 @@ export function DashboardHome() {
         <StatTile label="Topics mastered" value={String(topicsMastered)} sub={`of ${mastery.length} attempted`} />
       </div>
 
-      <div className="mb-3.5 text-[12.5px] font-bold uppercase tracking-wide text-text-dim">Your journeys</div>
+      <div className="mb-3.5 font-mono text-[12.5px] font-bold uppercase tracking-wide text-text-dim">Your journeys</div>
       {!loading && journeys.length === 0 && (
         <Card className="text-center text-text-muted">No journeys yet — click "+ Start new practice" in the sidebar to begin one.</Card>
       )}

@@ -5,11 +5,13 @@ import { getLlmSettings, saveLlmSettings, type LlmSettingsResponse } from '../..
 import { useProviderBadge } from '../../lib/ProviderBadgeContext';
 import type { ProviderId } from '../../types/db';
 
-const PROVIDERS: { id: ProviderId; label: string; defaultModel: string; needsKey: boolean; localOnly?: boolean; keyUrl?: string }[] = [
-  { id: 'ollama', label: 'Ollama (local)', defaultModel: 'llama3.1', needsKey: false, localOnly: true },
-  { id: 'groq', label: 'Groq', defaultModel: 'llama-3.3-70b-versatile', needsKey: true, keyUrl: 'https://console.groq.com/keys' },
-  { id: 'openai', label: 'OpenAI', defaultModel: 'gpt-4o-mini', needsKey: true, keyUrl: 'https://platform.openai.com/api-keys' },
-  { id: 'gemini', label: 'Gemini', defaultModel: 'gemini-2.0-flash', needsKey: true, keyUrl: 'https://aistudio.google.com/apikey' },
+const CUSTOM = '__custom__';
+
+const PROVIDERS: { id: ProviderId; label: string; models: string[]; needsKey: boolean; localOnly?: boolean; keyUrl?: string }[] = [
+  { id: 'ollama', label: 'Ollama (local)', models: ['llama3.1', 'llama3.2', 'llama3', 'mistral', 'qwen2.5', 'phi3'], needsKey: false, localOnly: true },
+  { id: 'groq', label: 'Groq', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'llama-3.1-70b-versatile', 'mixtral-8x7b-32768', 'gemma2-9b-it'], needsKey: true, keyUrl: 'https://console.groq.com/keys' },
+  { id: 'openai', label: 'OpenAI', models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-4.1', 'o4-mini'], needsKey: true, keyUrl: 'https://platform.openai.com/api-keys' },
+  { id: 'gemini', label: 'Gemini', models: ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro'], needsKey: true, keyUrl: 'https://aistudio.google.com/apikey' },
 ];
 
 const isHostedBuild = import.meta.env.VITE_DEPLOYMENT_MODE === 'hosted';
@@ -19,6 +21,7 @@ export function AiProviderTab() {
   const [settings, setSettings] = useState<LlmSettingsResponse | null>(null);
   const [provider, setProvider] = useState<ProviderId>('groq');
   const [model, setModel] = useState('');
+  const [customModel, setCustomModel] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,19 +32,23 @@ export function AiProviderTab() {
       setSettings(s);
       if (s.provider) {
         setProvider(s.provider);
-        setModel(s.model || PROVIDERS.find((p) => p.id === s.provider)?.defaultModel || '');
+        const p = PROVIDERS.find((x) => x.id === s.provider);
+        const m = s.model || p?.models[0] || '';
+        setModel(m);
+        setCustomModel(!!m && !p?.models.includes(m));
       }
     });
   }, []);
 
   const meta = PROVIDERS.find((p) => p.id === provider)!;
+  const defaultModel = meta.models[0];
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     setSavedMsg(false);
     try {
-      await saveLlmSettings({ provider, model: model || meta.defaultModel, apiKey: apiKey.trim() ? apiKey.trim() : undefined });
+      await saveLlmSettings({ provider, model: model.trim() || defaultModel, apiKey: apiKey.trim() ? apiKey.trim() : undefined });
       setApiKey('');
       const fresh = await getLlmSettings();
       setSettings(fresh);
@@ -57,7 +64,7 @@ export function AiProviderTab() {
   async function handleClearKey() {
     setSaving(true);
     try {
-      await saveLlmSettings({ provider, model: model || meta.defaultModel, apiKey: null });
+      await saveLlmSettings({ provider, model: model.trim() || defaultModel, apiKey: null });
       const fresh = await getLlmSettings();
       setSettings(fresh);
       refreshBadge();
@@ -90,7 +97,8 @@ export function AiProviderTab() {
                 type="button"
                 onClick={() => {
                   setProvider(p.id);
-                  setModel(p.defaultModel);
+                  setModel(p.models[0]);
+                  setCustomModel(false);
                 }}
                 className="rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors"
                 style={
@@ -108,12 +116,36 @@ export function AiProviderTab() {
 
         <label className="flex flex-col gap-1.5 text-[13px] font-medium text-text-muted">
           Model
-          <input
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder={meta.defaultModel}
+          <select
+            value={customModel ? CUSTOM : model}
+            onChange={(e) => {
+              if (e.target.value === CUSTOM) {
+                setCustomModel(true);
+                setModel('');
+              } else {
+                setCustomModel(false);
+                setModel(e.target.value);
+              }
+            }}
             className="rounded-[10px] border border-border bg-panel px-3.5 py-2.5 text-[14px] text-text outline-none focus:border-accent"
-          />
+          >
+            {meta.models.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+            <option value={CUSTOM}>Custom…</option>
+          </select>
+          {customModel && (
+            <input
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder={`exact ${meta.label} model id`}
+              autoFocus
+              className="mt-1.5 rounded-[10px] border border-border bg-panel px-3.5 py-2.5 text-[14px] text-text outline-none focus:border-accent"
+            />
+          )}
+          <span className="text-[12px] text-text-dim">Pick a valid model id — a wrong id (e.g. a plan name) makes every quiz fail to generate.</span>
         </label>
 
         {meta.needsKey && (

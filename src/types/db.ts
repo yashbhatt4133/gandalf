@@ -61,6 +61,8 @@ export interface QuizSession {
   journey_id: string | null;
   user_id: string;
   session_type: SessionType;
+  topic: string | null;
+  domain: string | null;
   taken_at: string;
   score: number | null;
   level_at_time: Difficulty | null;
@@ -69,6 +71,19 @@ export interface QuizSession {
   time_taken_seconds: number | null;
   provider_used: string | null;
   model_used: string | null;
+}
+
+export interface QuizFeedback {
+  id: string;
+  quiz_session_id: string;
+  user_id: string;
+  pre_question_types: QuestionType[] | null;
+  pre_difficulty: Difficulty | null;
+  pre_description: string | null;
+  post_satisfaction: number | null;
+  post_comment: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface QuizQuestion {
@@ -87,6 +102,7 @@ export interface QuizQuestion {
   time_spent_seconds: number | null;
   difficulty: Difficulty;
   order_index: number;
+  tags: string[];
 }
 
 /** Question shape as delivered to the browser — no answer key. */

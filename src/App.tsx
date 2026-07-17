@@ -15,6 +15,8 @@ import { LearningScreen } from './screens/Learning/LearningScreen';
 import { TimedTestPicker } from './screens/TimedTest/TimedTestPicker';
 import { AdaptiveQuizScreen } from './screens/AdaptiveQuiz/AdaptiveQuizScreen';
 import { SettingsScreen } from './screens/Settings/SettingsScreen';
+import { HistoryScreen } from './screens/History/HistoryScreen';
+import { SessionReviewScreen } from './screens/History/SessionReviewScreen';
 
 export default function App() {
   return (
@@ -38,6 +40,8 @@ export default function App() {
                     <Route path="/timed-test/:sessionId" element={<QuizRunner />} />
                     <Route path="/adaptive-quiz" element={<AdaptiveQuizScreen />} />
                     <Route path="/adaptive-quiz/:sessionId" element={<QuizRunner />} />
+                    <Route path="/history" element={<HistoryScreen />} />
+                    <Route path="/history/:sessionId" element={<SessionReviewScreen />} />
                     <Route path="/settings" element={<SettingsScreen />} />
                   </Route>
                 </Route>
