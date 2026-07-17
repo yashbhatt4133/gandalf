@@ -18,7 +18,7 @@ export function TopBar() {
       .toUpperCase() || '?';
 
   return (
-    <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border-soft bg-panel px-7 py-3.5">
+    <div className="chrome-glass sticky top-0 z-10 flex items-center justify-between border-b border-border-soft px-7 py-3.5">
       <Link to="/dashboard" className="flex items-center gap-2.5 text-[18px] font-bold tracking-tight">
         <span className="flex h-10 w-10 items-center justify-center rounded-[11px] border border-border-soft bg-panel-2">
           <GandalfMark size={30} />

@@ -124,6 +124,43 @@ export async function generateOneAdaptiveQuestion({ provider, model, apiKey, top
   return question;
 }
 
+// ---------- Dynamic topic suggestions (Adaptive Quiz topic picker) ----------
+
+/** Defensive parse of the suggestion model's JSON array of short strings. */
+export function parseTopicList(raw) {
+  let t = (raw || '').trim();
+  const fenced = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) t = fenced[1].trim();
+  const start = t.indexOf('[');
+  const end = t.lastIndexOf(']');
+  if (start !== -1 && end !== -1) t = t.slice(start, end + 1);
+  try {
+    const parsed = JSON.parse(t);
+    if (!Array.isArray(parsed)) return null;
+    const clean = Array.from(
+      new Set(parsed.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim().replace(/\s+/g, ' ').slice(0, 60)))
+    ).slice(0, 6);
+    return clean.length ? clean : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Generate a handful of specific, practiceable sub-topics for a domain. */
+export async function generateTopicSuggestions({ provider, model, apiKey, domain, targetRole, interests, existing }) {
+  const avoid = existing?.length ? `\n\nDo NOT repeat any of these already-listed topics: ${existing.join(', ')}.` : '';
+  const persona = targetRole ? ` The candidate is preparing for ${targetRole} interviews.` : '';
+  const interestLine = interests?.length ? ` They're interested in ${interests.slice(0, 5).join(', ')} — lean toward sub-topics that connect where natural.` : '';
+  const prompt = `List 6 specific, practiceable sub-topics within the interview-prep domain "${domain}" that are commonly tested in first-round technical online assessments (OA/OT).${persona}${interestLine} Each must be a short noun phrase (2-5 words), specific enough to build a focused quiz around — never the whole domain again, and no "how to study" meta-topics.${avoid}
+
+Return ONLY a JSON array of exactly 6 short strings (no markdown fences, no prose), e.g. ["Sliding Window", "Two Pointers", "Monotonic Stack", ...].`;
+
+  let parsed = parseTopicList(await provider.generateText({ prompt, model, apiKey }));
+  if (!parsed) parsed = parseTopicList(await provider.generateText({ prompt, model, apiKey }));
+  if (!parsed) throw new Error('The AI provider returned an unreadable topic list. Try again, or switch model/provider in Settings.');
+  return parsed;
+}
+
 // ---------- Per-question review helpers (History screen: Explain More / Validate) ----------
 
 function formatOptions(options) {

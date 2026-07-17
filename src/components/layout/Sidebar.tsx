@@ -30,7 +30,7 @@ export function Sidebar() {
   const navigate = useNavigate();
 
   return (
-    <aside className="w-[272px] flex-shrink-0 border-r border-border-soft bg-panel p-5">
+    <aside className="chrome-glass w-[272px] flex-shrink-0 self-stretch border-r border-border-soft p-5">
       <Button block onClick={() => setModalOpen(true)}>
         + Start new practice
       </Button>

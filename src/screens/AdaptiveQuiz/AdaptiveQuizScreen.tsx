@@ -45,6 +45,8 @@ export function AdaptiveQuizScreen() {
           <TopicPicker
             domain={domain}
             topic={topic}
+            enableCustomTopic
+            enableSuggest
             onChange={(d, t) => {
               setDomain(d);
               setTopic(t);

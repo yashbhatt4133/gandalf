@@ -29,6 +29,8 @@ export function JourneyDetail() {
   const [error, setError] = useState<string | null>(null);
   const [prefs, setPrefs] = useState(defaultPreQuizPrefs());
   const [calModalOpen, setCalModalOpen] = useState(false);
+  const [adaptiveModalOpen, setAdaptiveModalOpen] = useState(false);
+  const [adaptiveBusy, setAdaptiveBusy] = useState(false);
 
   const load = useCallback(() => {
     if (!journeyId) return;
@@ -48,6 +50,34 @@ export function JourneyDetail() {
     setPrefs(defaultPreQuizPrefs());
     setError(null);
     setCalModalOpen(true);
+  }
+
+  function openAdaptiveModal() {
+    setPrefs(defaultPreQuizPrefs());
+    setError(null);
+    setAdaptiveModalOpen(true);
+  }
+
+  // Freeform adaptive practice scoped to this journey's topic — tied to the
+  // journey (journeyId) so it feeds the same topic metrics, then routes back here.
+  async function startAdaptive() {
+    setAdaptiveBusy(true);
+    setError(null);
+    try {
+      const { sessionId, questions, timeLimitSeconds } = await generateQuiz({
+        sessionType: 'adaptive',
+        topic: journey!.topic,
+        domain: journey!.domain,
+        questionCount: 1,
+        journeyId: journey!.id,
+        ...preQuizPrefsToParams(prefs),
+      });
+      const state: QuizRunnerState = { questions, timeLimitSeconds, sessionType: 'adaptive', topic: journey!.topic, domain: journey!.domain, journeyId: journey!.id };
+      navigate(`/adaptive-quiz/${sessionId}`, { state });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start the quiz.');
+      setAdaptiveBusy(false);
+    }
   }
 
   // `includePrefs` is only true for the calibration quiz (opened via the
@@ -109,7 +139,7 @@ export function JourneyDetail() {
       </div>
       <h1 className="mb-6 text-2xl font-extrabold tracking-tight">{journey.topic}</h1>
 
-      {error && !calModalOpen && <p className="mb-4 text-[13px] text-danger">{error}</p>}
+      {error && !calModalOpen && !adaptiveModalOpen && <p className="mb-4 text-[13px] text-danger">{error}</p>}
 
       <Card className="mb-6">
         <div className="mb-4 font-mono text-[12.5px] font-bold uppercase tracking-wide text-text-dim">Steps</div>
@@ -163,11 +193,16 @@ export function JourneyDetail() {
       </Card>
 
       <Card className="mb-6">
-        <div className="mb-1 text-[14px] font-bold">Simulate the real thing</div>
-        <p className="mb-3 text-[13px] text-text-muted">Race the clock on {journey.topic} — same mechanic as an actual OA/OT.</p>
-        <Link to={`/timed-test?topic=${encodeURIComponent(journey.topic)}&domain=${encodeURIComponent(journey.domain)}`}>
-          <Button variant="ghost">Start a Time-Bound Test</Button>
-        </Link>
+        <div className="mb-1 text-[14px] font-bold">Keep practicing {journey.topic}</div>
+        <p className="mb-3 text-[13px] text-text-muted">Drill this topic outside the journey steps — freeform one-at-a-time, or against the clock like a real OA/OT.</p>
+        <div className="flex flex-wrap gap-2.5">
+          <Button variant="ghost" onClick={openAdaptiveModal} disabled={adaptiveBusy}>
+            {adaptiveBusy ? 'Generating…' : 'Start adaptive quiz'}
+          </Button>
+          <Link to={`/timed-test?topic=${encodeURIComponent(journey.topic)}&domain=${encodeURIComponent(journey.domain)}`}>
+            <Button variant="ghost">Start a Time-Bound Test</Button>
+          </Link>
+        </div>
       </Card>
 
       <MetricsPanel userId={journey.user_id} domain={journey.domain} topic={journey.topic} />
@@ -194,6 +229,35 @@ export function JourneyDetail() {
                     Cancel
                   </Button>
                   <Button onClick={() => startQuiz('calibration', true)}>Start</Button>
+                </div>
+              </>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {adaptiveModalOpen && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4" onClick={() => !adaptiveBusy && setAdaptiveModalOpen(false)}>
+          <Card className="max-h-[85vh] w-full max-w-lg overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {adaptiveBusy ? (
+              <>
+                <GandalfMark size={72} className="mx-auto mb-2 block" />
+                <GeneratingChecklist title="Building your first question…" />
+              </>
+            ) : (
+              <>
+                <div className="mb-4 flex flex-col items-center text-center">
+                  <GandalfMark size={72} className="mb-2 block" />
+                  <h2 className="text-lg font-bold">Adaptive quiz</h2>
+                  <p className="mt-1 text-[13px] text-text-muted">Freeform, untimed practice on {journey.topic} — one question at a time, explanation after each.</p>
+                </div>
+                <PreQuizFeedback prefs={prefs} onChange={setPrefs} />
+                {error && <p className="mb-3 text-[13px] text-danger">{error}</p>}
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setAdaptiveModalOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={startAdaptive}>Start</Button>
                 </div>
               </>
             )}

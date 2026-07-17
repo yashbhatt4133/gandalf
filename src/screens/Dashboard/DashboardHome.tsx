@@ -35,18 +35,22 @@ function JourneyCard({ id, topic, domain, status }: { id: string; topic: string;
 export function DashboardHome() {
   const { session } = useAuth();
   const { profile } = useProfile();
-  const { journeys, loading } = useJourneys();
+  const { journeys, loading, refresh: refreshJourneys } = useJourneys();
   const [mastery, setMastery] = useState<TopicMastery[]>([]);
   const [streaks, setStreaks] = useState({ current: 0, longest: 0 });
 
   useEffect(() => {
     if (!session) return;
+    // Journeys live in a context that persists across screens (it isn't
+    // remounted on navigation), so re-pull it here to catch status changes made
+    // inside the QuizRunner (reassessment pass → mastered, "continue anyway").
+    refreshJourneys();
     listTopicMastery(session.user.id).then(setMastery);
     listQuizSessions(session.user.id).then((sessions) => {
       const dates = sessions.filter((s) => s.completed).map((s) => s.taken_at);
       setStreaks({ current: computeCurrentStreak(dates), longest: computeLongestStreak(dates) });
     });
-  }, [session]);
+  }, [session, refreshJourneys]);
 
   const activeJourneys = journeys.filter((j) => j.status !== 'mastered');
   const completedJourneys = journeys.filter((j) => j.status === 'mastered');

@@ -61,6 +61,13 @@ export function generateQuiz(params: GenerateQuizParams) {
   });
 }
 
+export function suggestTopics(params: { domain: string; existing?: string[] }) {
+  return apiFetch<{ topics: string[] }>('/api/suggest-topics', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
 export function generateAdaptiveQuestion(sessionId: string, topic: string, domain: string) {
   return apiFetch<{ question: ClientQuizQuestion }>('/api/generate-adaptive-question', {
     method: 'POST',

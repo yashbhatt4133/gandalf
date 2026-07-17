@@ -9,8 +9,8 @@
   --panel: #ffffff;
   --panel-2: #f2f4f9;
   --panel-3: #e7ebf3;
-  --border: #d8dee9;
-  --border-soft: #e4e8f1;
+  --border: #c3cddc;
+  --border-soft: #d4dce9;
   --accent: #7c3aed;
   --accent-soft: #6d28d9;
   --accent-glow: #a78bfa;
@@ -150,6 +150,24 @@ pre {
   }
   50% {
     transform: translate(-2%, 1.5%) rotate(2deg);
+  }
+}
+
+/* ================= App chrome (top bar + sidebar) ================= */
+/* Frosted "glass" so the fixed cosmic background (stars + nebula) reads THROUGH
+   the bars instead of a flat opaque panel that visibly clashes with the
+   starfield behind the main content. Same rule both themes — only the token
+   values differ, so light reads as a pale frosted bar and dark as a smoky one. */
+.chrome-glass {
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+}
+/* Fallback for engines without color-mix: a plain (opaque) panel — still fine,
+   just no see-through. */
+@supports not (background: color-mix(in srgb, white 50%, transparent)) {
+  .chrome-glass {
+    background: var(--panel);
   }
 }
 

@@ -25,6 +25,7 @@ import {
   validateQuestion,
   generateVerticalsForJourney,
   forceCompleteJourney,
+  suggestTopicsForUser,
 } from './core/sessions.js';
 
 const app = express();
@@ -70,6 +71,14 @@ app.post(
   asyncHandler(async (req, res) => {
     const user = await verifyUser(req.headers.authorization);
     res.json(await createQuizSession(user.id, req.body));
+  })
+);
+
+app.post(
+  '/api/suggest-topics',
+  asyncHandler(async (req, res) => {
+    const user = await verifyUser(req.headers.authorization);
+    res.json(await suggestTopicsForUser(user.id, req.body));
   })
 );
 

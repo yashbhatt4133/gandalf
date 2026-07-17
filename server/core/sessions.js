@@ -6,7 +6,7 @@
 import { getSupabaseAdmin } from './supabaseAdmin.js';
 import { resolveProviderForUser, isDeployedMode, localFallback, formatBadgeLabel, DEFAULT_MODELS } from './providers/index.js';
 import { encryptApiKey } from './crypto.js';
-import { generateQuizBatch, generateOneAdaptiveQuestion, generateExplanation, validateGeneratedQuestion } from './quiz.js';
+import { generateQuizBatch, generateOneAdaptiveQuestion, generateExplanation, validateGeneratedQuestion, generateTopicSuggestions } from './quiz.js';
 import { generateVerticals } from './verticals.js';
 import { parseResumeText } from './cvParse.js';
 import { NotFoundError, BadRequestError } from './errors.js';
@@ -261,6 +261,24 @@ export async function createQuizSession(userId, { sessionType, topic, domain, qu
 
   const clientQuestions = inserted.sort((a, b) => a.order_index - b.order_index).map(stripAnswerKey);
   return { sessionId: session.id, questions: clientQuestions, timeLimitSeconds: session.time_limit_seconds };
+}
+
+/** Dynamic topic-chip suggestions for the Adaptive Quiz picker's "Suggest topics"
+ *  action — profile-personalized, and de-duped against topics already shown. */
+export async function suggestTopicsForUser(userId, { domain, existing }) {
+  if (!domain || typeof domain !== 'string') throw new BadRequestError('domain is required.');
+  const admin = getSupabaseAdmin();
+  const { data: profile } = await admin.from('profiles').select('target_role').eq('user_id', userId).maybeSingle();
+  const { data: interestRows } = await admin.from('user_interests').select('label').eq('user_id', userId);
+  const interests = (interestRows ?? []).map((r) => r.label);
+
+  const cleanExisting = Array.isArray(existing)
+    ? Array.from(new Set(existing.filter((t) => typeof t === 'string' && t.trim()).map((t) => t.trim()))).slice(0, 40)
+    : [];
+
+  const { provider, model, apiKey } = await resolveProviderForUser(userId);
+  const topics = await generateTopicSuggestions({ provider, model, apiKey, domain, targetRole: profile?.target_role, interests, existing: cleanExisting });
+  return { topics };
 }
 
 export async function generateNextAdaptiveQuestion(userId, { sessionId, topic, domain }) {
