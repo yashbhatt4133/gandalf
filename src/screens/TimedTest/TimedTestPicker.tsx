@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { DomainChip } from '../../components/ui/Chip';
 import { TopicPicker } from '../../components/TopicPicker';
 import { PreQuizFeedback, defaultPreQuizPrefs, preQuizPrefsToParams } from '../../components/PreQuizFeedback';
 import { generateQuiz } from '../../lib/api';
@@ -15,6 +16,10 @@ export function TimedTestPicker() {
   const navigate = useNavigate();
   const [domain, setDomain] = useState<string | null>(params.get('domain'));
   const [topic, setTopic] = useState(params.get('topic') || '');
+  // When launched from a journey the topic is fixed to that journey's topic —
+  // lock it (no re-picking) and tie the session back to the journey.
+  const journeyId = params.get('journeyId') || undefined;
+  const locked = params.get('locked') === '1' && !!domain && !!topic.trim();
   const [questionCount, setQuestionCount] = useState(10);
   const [customCount, setCustomCount] = useState(false);
   const [timeLimitMin, setTimeLimitMin] = useState(10);
@@ -34,9 +39,10 @@ export function TimedTestPicker() {
         domain,
         questionCount,
         timeLimitSeconds: timeLimitMin * 60,
+        journeyId: journeyId ?? null,
         ...preQuizPrefsToParams(prefs),
       });
-      const state: QuizRunnerState = { questions, timeLimitSeconds, sessionType: 'timed_test', topic: topic.trim(), domain };
+      const state: QuizRunnerState = { questions, timeLimitSeconds, sessionType: 'timed_test', topic: topic.trim(), domain, journeyId };
       navigate(`/timed-test/${sessionId}`, { state });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start the test.');
@@ -47,18 +53,35 @@ export function TimedTestPicker() {
   return (
     <div className="max-w-xl">
       <h1 className="mb-1 text-2xl font-extrabold tracking-tight">Time-Bound Test</h1>
-      <p className="mb-6 text-[14.5px] text-text-muted">Simulate a real OA/OT — pick a topic, question count, and time limit, then race the clock.</p>
+      <p className="mb-6 text-[14.5px] text-text-muted">
+        {locked
+          ? 'Simulate a real OA/OT on this journey’s topic — pick a question count and time limit, then race the clock.'
+          : 'Simulate a real OA/OT — pick a topic, question count, and time limit, then race the clock.'}
+      </p>
 
       <Card>
         <div className="mb-5">
-          <TopicPicker
-            domain={domain}
-            topic={topic}
-            onChange={(d, t) => {
-              setDomain(d);
-              setTopic(t);
-            }}
-          />
+          {locked ? (
+            <div>
+              <div className="mb-2 text-[12.5px] font-semibold text-text-muted">Topic</div>
+              <div className="flex items-center gap-2.5 rounded-xl border border-border-soft bg-panel-2 px-4 py-3">
+                <DomainChip domain={domain!} />
+                <span className="text-[14px] font-semibold">{topic}</span>
+              </div>
+              <p className="mt-2 text-[12px] text-text-dim">From your journey — this test runs on the same topic.</p>
+            </div>
+          ) : (
+            <TopicPicker
+              domain={domain}
+              topic={topic}
+              enableCustomTopic
+              enableSuggest
+              onChange={(d, t) => {
+                setDomain(d);
+                setTopic(t);
+              }}
+            />
+          )}
         </div>
 
         <div className="mb-5">

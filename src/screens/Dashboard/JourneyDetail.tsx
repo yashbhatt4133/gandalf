@@ -199,7 +199,7 @@ export function JourneyDetail() {
           <Button variant="ghost" onClick={openAdaptiveModal} disabled={adaptiveBusy}>
             {adaptiveBusy ? 'Generating…' : 'Start adaptive quiz'}
           </Button>
-          <Link to={`/timed-test?topic=${encodeURIComponent(journey.topic)}&domain=${encodeURIComponent(journey.domain)}`}>
+          <Link to={`/timed-test?locked=1&journeyId=${journey.id}&topic=${encodeURIComponent(journey.topic)}&domain=${encodeURIComponent(journey.domain)}`}>
             <Button variant="ghost">Start a Time-Bound Test</Button>
           </Link>
         </div>

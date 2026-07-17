@@ -30,6 +30,17 @@ const chipStyle = (active: boolean) => ({
   borderColor: active ? 'var(--accent)' : undefined,
 });
 
+// The "Custom …" chips get a distinct accent-tinted, dashed-outline look so
+// they read as "make your own" rather than another preset domain — legible in
+// both light and dark via the accent token.
+const customChipStyle = (active: boolean) => ({
+  cursor: 'pointer' as const,
+  background: active ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 15%, transparent)',
+  color: active ? '#fff' : 'var(--accent)',
+  borderColor: 'var(--accent)',
+  borderStyle: active ? ('solid' as const) : ('dashed' as const),
+});
+
 /** Shared domain+topic chip picker (taxonomy tree + free text), used by New Journey / Time-Bound Test / Adaptive Quiz. */
 export function TopicPicker({ domain, topic, onChange, enableCustomFocus, onFocusChange, enableCustomTopic, enableSuggest }: TopicPickerProps) {
   const [customMode, setCustomMode] = useState(false);
@@ -106,13 +117,13 @@ export function TopicPicker({ domain, topic, onChange, enableCustomFocus, onFocu
             </button>
           ))}
           {enableCustomTopic && (
-            <button type="button" onClick={pickCustomTopic} className="chip" style={chipStyle(customTopicMode)}>
-              Custom topic
+            <button type="button" onClick={pickCustomTopic} className="chip" style={customChipStyle(customTopicMode)}>
+              + Custom topic
             </button>
           )}
           {enableCustomFocus && (
-            <button type="button" onClick={pickCustomFocus} className="chip" style={chipStyle(focusMode)}>
-              Custom — role &amp; company
+            <button type="button" onClick={pickCustomFocus} className="chip" style={customChipStyle(focusMode)}>
+              + Custom — role &amp; company
             </button>
           )}
         </div>

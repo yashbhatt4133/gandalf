@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -63,7 +64,12 @@ export function NewJourneyModal({ onClose, onCreated }: { onClose: () => void; o
     }
   }
 
-  return (
+  // Rendered through a portal to <body> so the overlay is never trapped by a
+  // positioned/filtered ancestor. (The Sidebar that mounts this modal uses
+  // `backdrop-filter`, which makes it a containing block for fixed-position
+  // descendants — without the portal the overlay anchors to the sidebar and
+  // shows up as a narrow side panel instead of a centered popup.)
+  return createPortal(
     <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <Card className="max-h-[85vh] w-full max-w-lg overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {generating ? (
@@ -83,6 +89,7 @@ export function NewJourneyModal({ onClose, onCreated }: { onClose: () => void; o
               domain={domain}
               topic={topic}
               enableCustomFocus
+              enableCustomTopic
               onFocusChange={setFocus}
               onChange={(d, t) => {
                 setDomain(d);
@@ -109,6 +116,7 @@ export function NewJourneyModal({ onClose, onCreated }: { onClose: () => void; o
           </>
         )}
       </Card>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -198,9 +198,9 @@ export function ProfileForm({ onSaved }: { onSaved?: () => void }) {
             <div className="mt-3 flex flex-col gap-3">
               <div className="flex flex-wrap gap-2">
                 {interests.map((i) => (
-                  <span key={i.id} className="chip">
+                  <span key={i.id} className="chip" style={{ background: 'var(--accent)', borderColor: 'var(--accent)', color: '#fff' }}>
                     {i.label}
-                    <button type="button" onClick={() => handleRemoveInterest(i.id)} className="ml-1 text-text-dim hover:text-danger">
+                    <button type="button" onClick={() => handleRemoveInterest(i.id)} className="ml-1 text-white/70 hover:text-white">
                       ×
                     </button>
                   </span>
